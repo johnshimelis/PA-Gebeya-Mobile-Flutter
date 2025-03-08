@@ -95,7 +95,6 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     }
   }
 
-  // Verify OTP and store user details
   Future<void> verifyOtp() async {
     String otp = otpController.text.trim();
     if (otp.length != 6) {
@@ -130,15 +129,16 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
         // Save user data to SharedPreferences
         SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('userData', json.encode(user));
         await prefs.setString(
-            'userData', json.encode(user)); // Store entire user object
-
-// Reload SharedPreferences to confirm data is saved
-        await prefs.reload();
-        debugPrint("✅ Stored User Data: ${prefs.getString('userData')}");
+            'userId', user['userId']); // Save userId separately
+        await prefs.setString(
+            'token', responseBody['token']); // Save token separately
+        await prefs.reload(); // Reload to ensure data is updated
 
         debugPrint("✅ User logged in successfully: $user");
-        debugPrint("✅ Stored Token: ${prefs.getString('userData')}");
+        debugPrint("✅ Stored userId: ${prefs.getString('userId')}");
+        debugPrint("✅ Stored token: ${prefs.getString('token')}");
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('OTP Verified Successfully!')),
@@ -151,9 +151,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  'Error: ${responseBody['message'] ?? 'OTP verification failed!'}')),
+          const SnackBar(content: Text('OTP verification failed!')),
         );
       }
     } catch (e) {

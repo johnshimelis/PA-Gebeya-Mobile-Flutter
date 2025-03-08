@@ -66,13 +66,13 @@ class _BestsellerScreenState extends State<BestsellerScreen> {
       setState(() {
         isLoggedIn = true;
       });
-      print("✅ User is logged in: userId=$userId");
+      debugPrint("✅ User is logged in: userId=$userId");
     } else {
       setState(() {
         isLoggedIn = false;
         userId = null;
       });
-      print("🚨 User is not logged in or token expired.");
+      debugPrint("🚨 User is not logged in or token expired.");
     }
   }
 
@@ -150,15 +150,21 @@ class _BestsellerScreenState extends State<BestsellerScreen> {
 
     final url = Uri.parse('https://pa-gebeya-backend.onrender.com/api/cart');
 
+    // Ensure price is a number
+    double price = double.tryParse(product.price) ?? 0.0;
+
+    // Prepare the request payload
     final Map<String, dynamic> requestBody = {
       "userId": userId,
       "items": [
         {
           "productId": product.id,
           "productName": product.title,
-          "img": product.thumbnailPath ?? "",
-          "price": product.price,
-          "quantity": cartItems[product.id] ?? 1,
+          "img": product.thumbnailPath ??
+              null, // Use null if thumbnailPath is empty
+          "price": price, // Ensure price is a number
+          "quantity":
+              cartItems[product.id] ?? 1, // Default to 1 if quantity is not set
         }
       ]
     };
@@ -171,7 +177,7 @@ class _BestsellerScreenState extends State<BestsellerScreen> {
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer $token', // Include the token in the headers
         },
         body: jsonEncode(requestBody),
       );

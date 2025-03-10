@@ -3,11 +3,14 @@ import 'package:laza/components/bottom_nav_button.dart';
 import 'package:laza/components/colors.dart';
 import 'package:laza/extensions/context_extension.dart';
 import 'package:laza/models/index.dart';
-import 'package:laza/reviews_screen.dart';
 import 'package:laza/theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:http_parser/http_parser.dart';
 
 import 'cart_screen.dart';
-import 'components/laza_icons.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   const ProductDetailsScreen({super.key, required this.product});
@@ -19,16 +22,113 @@ class ProductDetailsScreen extends StatefulWidget {
 
 class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   late String selectedImage;
+  int quantity = 1; // Track quantity in the product details screen
+
   @override
   void initState() {
     selectedImage = widget.product.thumbnailPath;
     super.initState();
   }
 
+  Future<void> addToCart(Product product) async {
+    debugPrint("🟢 addToCart called for product: ${product.id}");
+
+    // Ensure product ID is valid
+    if (product.id == null || product.id!.isEmpty) {
+      debugPrint("🚨 Error: Product ID is null or empty!");
+      showToast("Error: Product ID is missing", error: true);
+      return;
+    }
+
+    // Directly access the token from user data
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('token');
+    String? userId = prefs.getString('userId'); // Ensure userId is not null
+
+    if (token == null || token.isEmpty) {
+      debugPrint("🚨 Error: Token is missing or expired!");
+      showToast("Please login to add items to the cart", error: true);
+      return;
+    }
+
+    if (userId == null || userId.isEmpty) {
+      debugPrint("🚨 Error: User ID is missing!");
+      showToast("Please login to add items to the cart", error: true);
+      return;
+    }
+
+    final url = Uri.parse('https://pa-gebeya-backend.onrender.com/api/cart');
+
+    // Create a multipart request
+    var request = http.MultipartRequest('POST', url);
+
+    // Add headers
+    request.headers['Authorization'] = 'Bearer $token';
+
+    // Add fields to the request
+    request.fields['userId'] = userId;
+    request.fields['productId'] = product.id!;
+    request.fields['productName'] = product.title;
+    request.fields['price'] = product.price.toString();
+    request.fields['quantity'] =
+        quantity.toString(); // Use the quantity from the state
+
+    // Add image URL as a field (if available)
+    if (product.thumbnailPath != null && product.thumbnailPath!.isNotEmpty) {
+      request.fields['img'] =
+          product.thumbnailPath!; // Send the image URL directly
+      debugPrint("🟢 Image URL added to request: ${product.thumbnailPath}");
+    } else {
+      debugPrint("🚨 Warning: Product image is missing!");
+    }
+
+    // Log all fields being added to the request
+    debugPrint("📌 Request Fields:");
+    request.fields.forEach((key, value) {
+      debugPrint("$key: $value");
+    });
+
+    debugPrint("🔹 Sending request to: $url");
+
+    try {
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      debugPrint("✅ Response Status: ${response.statusCode}");
+      debugPrint("📩 Response Body: $responseBody");
+
+      if (response.statusCode == 200) {
+        showToast("$quantity ${product.title} added to cart");
+      } else {
+        final errorMessage =
+            jsonDecode(responseBody)['error'] ?? "Unknown error";
+        showToast("Failed to add ${product.title} to cart: $errorMessage",
+            error: true);
+      }
+    } catch (error) {
+      debugPrint("❌ Error adding to cart: $error");
+      showToast("Error adding to cart. Please try again.", error: true);
+    }
+  }
+
+  // Show toast messages
+  void showToast(String message, {bool error = false}) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.TOP,
+      backgroundColor: error ? Colors.red : Colors.green,
+      textColor: Colors.white,
+      fontSize: 16.0,
+      timeInSecForIosWeb: 3,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
-    final bottomPadding = context.bottomViewPadding == 0.0 ? 30.0 : context.bottomViewPadding;
+    final bottomPadding =
+        context.bottomViewPadding == 0.0 ? 30.0 : context.bottomViewPadding;
     return Scaffold(
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
@@ -44,14 +144,22 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Total Price', style: context.bodyMediumW600),
-                    Text('with VAT,SD', style: context.bodyExtraSmall?.copyWith(color: ColorConstant.manatee)),
+                    Text('with VAT,SD',
+                        style: context.bodyExtraSmall
+                            ?.copyWith(color: ColorConstant.manatee)),
                   ],
                 ),
-                Text('\$125', style: context.bodyLargeW600)
+                Text(
+                    '\$${(double.parse(product.price) * quantity).toStringAsFixed(2)}',
+                    style: context.bodyLargeW600)
               ],
             ),
           ),
-          BottomNavButton(label: 'Add to Cart', onTap: () {}),
+          BottomNavButton(
+            label: 'Add to Cart',
+            onTap: () => addToCart(
+                widget.product), // Call addToCart when the button is pressed
+          ),
         ],
       ),
       body: CustomScrollView(
@@ -86,14 +194,18 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     color: AppTheme.lightTheme.cardColor,
                     shape: const CircleBorder(),
                   ),
-                  child: const Icon(LazaIcons.heart),
+                  child: const Icon(Icons
+                      .favorite_border), // Replaced LazaIcons.heart with Icons.favorite_border
                 ),
               ),
               Padding(
                 padding: const EdgeInsets.only(right: 20.0, left: 10.0),
                 child: InkWell(
                   borderRadius: const BorderRadius.all(Radius.circular(50)),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CartScreen())),
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const CartScreen())),
                   child: Ink(
                     width: 45,
                     height: 45,
@@ -102,7 +214,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       shape: const CircleBorder(),
                     ),
                     child: const Icon(
-                      LazaIcons.bag,
+                      Icons
+                          .shopping_cart, // Replaced LazaIcons.bag with Icons.shopping_cart
                     ),
                   ),
                 ),
@@ -110,16 +223,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             ],
             backgroundColor: const Color(0xffF2F2F2),
             surfaceTintColor: Colors.transparent,
-            // backgroundColor: context.theme.scaffoldBackgroundColor,
             expandedHeight: 400,
             flexibleSpace: FlexibleSpaceBar(
               background: SafeArea(
-                  child: Image.asset(
+                  child: Image.network(
                 selectedImage,
                 fit: BoxFit.fitHeight,
               )),
             ),
-            systemOverlayStyle: context.theme.appBarTheme.systemOverlayStyle!.copyWith(
+            systemOverlayStyle:
+                context.theme.appBarTheme.systemOverlayStyle!.copyWith(
               statusBarIconBrightness: Brightness.dark,
               statusBarBrightness: Brightness.light,
             ),
@@ -135,7 +248,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(product.category ?? 'Men\'s Printed Pullover Hoodie', style: context.bodySmall),
+                      Text(product.category ?? 'Men\'s Printed Pullover Hoodie',
+                          style: context.bodySmall),
                       const SizedBox(height: 5.0),
                       Text(
                         product.title,
@@ -203,7 +317,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       TextButton(
                           onPressed: () {},
                           child: Text('Size Guide',
-                              style: context.bodyMedium?.copyWith(color: context.theme.primaryColor))),
+                              style: context.bodyMedium?.copyWith(
+                                  color: context.theme.primaryColor))),
                     ],
                   ),
                 ),
@@ -224,7 +339,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: context.theme.cardColor,
-                            borderRadius: const BorderRadius.all(Radius.circular(10.0)),
+                            borderRadius:
+                                const BorderRadius.all(Radius.circular(10.0)),
                           ),
                           child: Text(
                             text,
@@ -238,7 +354,62 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
           // ============================================================
-          // Size Guide
+          // Quantity Section
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Quantity',
+                    style: context.bodyLargeW600,
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.remove, color: Colors.red),
+                          onPressed: () {
+                            setState(() {
+                              if (quantity > 1) {
+                                quantity--;
+                              }
+                            });
+                          },
+                        ),
+                        Text(
+                          "$quantity",
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.white
+                                  : Colors.black),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add, color: Colors.green),
+                          onPressed: () {
+                            setState(() {
+                              quantity++;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 20)),
+          // ============================================================
+          // Description
           if (product.description != null)
             SliverToBoxAdapter(
                 child: Padding(
@@ -248,117 +419,18 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 children: [
                   Text('Description', style: context.bodyLargeW600),
                   const SizedBox(height: 10.0),
-                  Text(product.description!, style: context.bodyMedium?.copyWith(color: ColorConstant.manatee)),
+                  Text(product.description!,
+                      style: context.bodyMedium
+                          ?.copyWith(color: ColorConstant.manatee)),
                   const SizedBox(height: 20.0),
                 ],
               ),
             )),
           // ============================================================
-          // Reviews
-          SliverToBoxAdapter(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Reviews',
-                        style: context.bodyLargeW600,
-                      ),
-                      TextButton(
-                          onPressed: () =>
-                              Navigator.push(context, MaterialPageRoute(builder: (context) => const ReviewsScreen())),
-                          child: const Text('View All')),
-                    ],
-                  ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20.0),
-                  child: ReviewCard(),
-                ),
-              ],
-            ),
-          ),
-
-          // ============================================================
           // Bottom padding
           SliverToBoxAdapter(child: SizedBox(height: bottomPadding)),
         ],
       ),
-    );
-  }
-}
-
-class ReviewCard extends StatelessWidget {
-  const ReviewCard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                const CircleAvatar(),
-                const SizedBox(width: 10.0),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Ronald Richards', style: context.bodyMediumW500),
-                    const SizedBox(height: 5.0),
-                    Row(
-                      children: [
-                        Icon(
-                          LazaIcons.clock,
-                          color: ColorConstant.manatee,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 5.0),
-                        Text(
-                          '13 Sep, 2020',
-                          style: context.bodyExtraSmall?.copyWith(color: ColorConstant.manatee),
-                        )
-                      ],
-                    )
-                  ],
-                ),
-              ],
-            ),
-            Column(
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      '4.8',
-                      style: context.bodyMediumW500,
-                    ),
-                    Text(
-                      ' rating',
-                      style: context.bodyExtraSmall?.copyWith(color: ColorConstant.manatee),
-                    )
-                  ],
-                ),
-                const SizedBox(height: 5.0),
-                Row(
-                  children: [
-                    const Icon(Icons.star, size: 14, color: Color(0xffFF981F)),
-                    const Icon(Icons.star, size: 14, color: Color(0xffFF981F)),
-                    const Icon(Icons.star, size: 14, color: Color(0xffFF981F)),
-                    Icon(Icons.star_border, size: 14, color: ColorConstant.manatee),
-                    Icon(Icons.star_border, size: 14, color: ColorConstant.manatee)
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 10.0),
-        const Text('Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque malesuada eget vitae amet...')
-      ],
     );
   }
 }

@@ -8,18 +8,19 @@ class ProductDetail {
   final String photo;
   final bool hasDiscount;
   final double discount;
+  String? thumbnailPath;
 
-  ProductDetail({
-    required this.id,
-    required this.name,
-    required this.price,
-    required this.shortDescription,
-    required this.fullDescription,
-    required this.stockQuantity,
-    required this.photo,
-    required this.hasDiscount,
-    required this.discount,
-  });
+  ProductDetail(
+      {required this.id,
+      required this.name,
+      required this.price,
+      required this.shortDescription,
+      required this.fullDescription,
+      required this.stockQuantity,
+      required this.photo,
+      required this.hasDiscount,
+      required this.discount,
+      required this.thumbnailPath});
 
   // From JSON response
   factory ProductDetail.fromJson(Map<String, dynamic> json) {
@@ -33,6 +34,7 @@ class ProductDetail {
       photo: json['photo'] ?? '',
       hasDiscount: json['hasDiscount'] ?? false,
       discount: json['discount']?.toDouble() ?? 0.0,
+      thumbnailPath: json['thumbnailPath'],
     );
   }
 }

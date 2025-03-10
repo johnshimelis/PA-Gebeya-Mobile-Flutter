@@ -8,7 +8,7 @@ import 'package:laza/extensions/context_extension.dart';
 import 'package:laza/reset_password/forgot_password_screen.dart';
 import 'package:laza/otp_verification_screen.dart';
 import 'package:http/http.dart' as http;
-
+import 'package:laza/sign_in_screen.dart';
 import 'components/bottom_nav_button.dart';
 import 'components/colors.dart';
 
@@ -122,10 +122,11 @@ class _SignInWithPhoneNumberState extends State<SignInWithPhoneNumber> {
                         'Welcome',
                         style: context.headlineMedium,
                       ),
-                      Text(
-                        'Please enter your phone number to continue',
-                        style: context.bodyMedium
-                            ?.copyWith(color: ColorConstant.manatee),
+                      const SizedBox(height: 20),
+                      // Replace text with PA-Logos.png logo
+                      Image.asset(
+                        'assets/images/PA-Logos.png', // Ensure the correct path
+                        height: 120, // Adjust height as needed
                       ),
                     ],
                   ),
@@ -181,6 +182,36 @@ class _SignInWithPhoneNumberState extends State<SignInWithPhoneNumber> {
                             value: rememberMe,
                             onChanged: (val) =>
                                 setState(() => rememberMe = val),
+                          ),
+                          const SizedBox(height: 20),
+                          // Add "Don't have an account? Sign Up" link
+                          TextButton(
+                            onPressed: () {
+                              // Navigate to the sign-up screen
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const SignInScreen(),
+                                ),
+                              );
+                            },
+                            child: Text.rich(
+                              TextSpan(
+                                text: "Don't have an account? ",
+                                style: context.bodyMedium?.copyWith(
+                                  color: ColorConstant.manatee,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: 'Sign Up',
+                                    style: context.bodyMedium?.copyWith(
+                                      color: ColorConstant.primary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),

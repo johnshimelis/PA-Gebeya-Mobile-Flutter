@@ -12,20 +12,50 @@ import 'package:shared_preferences/shared_preferences.dart';
 class DrawerWidget extends StatelessWidget {
   const DrawerWidget({super.key});
 
+  Future<bool> _isTokenExpired(String? token) async {
+    if (token == null) return true;
+
+    // Decode the token to get the expiration time
+    final parts = token.split('.');
+    if (parts.length != 3) {
+      return true;
+    }
+
+    final payload = json
+        .decode(utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
+
+    // Check if the token has an expiration time
+    if (payload['exp'] == null) {
+      return true;
+    }
+
+    final expirationTime =
+        DateTime.fromMillisecondsSinceEpoch(payload['exp'] * 1000);
+    final currentTime = DateTime.now();
+
+    return currentTime.isAfter(expirationTime);
+  }
+
   Future<String> _getUserName() async {
     // Load user data from SharedPreferences
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? userJson = prefs.getString('userData'); // Retrieve the user data
+    String? token = prefs.getString('token'); // Retrieve the token
 
-    if (userJson != null) {
-      // If user is logged in, return the full name
+    if (userJson != null && token != null) {
+      // Check if the token is expired
+      bool isExpired = await _isTokenExpired(token);
+
+      if (isExpired) {
+        // If token is expired, return "Guest User"
+        return 'Guest User';
+      }
+
+      // If user is logged in and token is not expired, return the full name
       Map<String, dynamic> userData =
           json.decode(userJson); // Decode the user data
-      String userId = userData['userId']; // Get the userId from the data
       String fullName = userData['fullName']; // Get the full name
       print("User details: $userData"); // Log the user data
-      print(
-          "Retrieved userId from SharedPreferences: $userId"); // Log the userId
       return fullName ?? 'Guest User'; // Return full name or 'Guest User'
     }
     // If user is not logged in, return "Guest User"

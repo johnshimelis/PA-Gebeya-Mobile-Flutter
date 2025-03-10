@@ -215,26 +215,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   : const Text("Verify OTP"),
             ),
             const SizedBox(height: 30),
-            if (userData != null) ...[
-              const Text(
-                "Logged-in User Details:",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              Text("User ID: ${userData!['userId']}"),
-              Text("Full Name: ${userData!['fullName']}"),
-              Text("Email: ${userData!['email']}"),
-              Text("Phone Number: ${userData!['phoneNumber']}"),
-              Text("Token: ${userData!['token']}"),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: logoutUser,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                ),
-                child: const Text("Logout"),
-              ),
-            ],
+            if (userData != null) ...[],
           ],
         ),
       ),

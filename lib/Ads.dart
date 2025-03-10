@@ -44,31 +44,37 @@ class _AdsState extends State<Ads> {
         final List<dynamic> data = json.decode(response.body);
 
         if (data.isNotEmpty) {
-          setState(() {
-            adImages = data
-                .expand((ad) => (ad["images"] as List).map(
-                    (img) => img.toString().isNotEmpty ? "$baseUrl$img" : ""))
-                .where((url) => url.isNotEmpty) // Remove empty URLs
-                .toList();
-            isLoading = false;
-            hasError = false;
-          });
+          if (mounted) {
+            setState(() {
+              adImages = data
+                  .expand((ad) => (ad["images"] as List).map(
+                      (img) => img.toString().isNotEmpty ? "$baseUrl$img" : ""))
+                  .where((url) => url.isNotEmpty) // Remove empty URLs
+                  .toList();
+              isLoading = false;
+              hasError = false;
+            });
 
-          if (adImages.isNotEmpty) _autoScroll();
+            if (adImages.isNotEmpty) _autoScroll();
+          }
         } else {
-          setState(() {
-            isLoading = false;
-            hasError = true;
-          });
+          if (mounted) {
+            setState(() {
+              isLoading = false;
+              hasError = true;
+            });
+          }
         }
       } else {
         throw Exception("Failed to load ads");
       }
     } catch (error) {
-      setState(() {
-        isLoading = false;
-        hasError = true;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          hasError = true;
+        });
+      }
       print("Error fetching ads: $error");
     }
   }
@@ -77,7 +83,7 @@ class _AdsState extends State<Ads> {
   void _autoScroll() {
     _timer?.cancel(); // Clear any existing timers
     _timer = Timer.periodic(const Duration(seconds: 3), (Timer timer) {
-      if (_controller.hasClients) {
+      if (_controller.hasClients && mounted) {
         _currentPage = (_currentPage + 1) % adImages.length;
         _controller.animateToPage(
           _currentPage,
@@ -133,9 +139,11 @@ class _AdsState extends State<Ads> {
           );
         },
         onPageChanged: (page) {
-          setState(() {
-            _currentPage = page;
-          });
+          if (mounted) {
+            setState(() {
+              _currentPage = page;
+            });
+          }
         },
       ),
     );

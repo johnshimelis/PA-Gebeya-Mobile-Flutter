@@ -8,11 +8,11 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:laza/cart_screen.dart';
 import 'package:laza/components/colors.dart';
 import 'package:laza/components/drawer.dart';
-import 'package:laza/components/laza_icons.dart';
 import 'package:laza/extensions/context_extension.dart';
 import 'package:laza/home_screen.dart';
 import 'package:laza/my_cards_screen.dart';
-import 'package:laza/wishlist_screen.dart';
+import 'package:laza/orders_screen.dart'; // Add this import for OrdersScreen
+import 'package:laza/chat_screen.dart'; // Add this import for ChatScreen
 import 'package:sliding_clipped_nav_bar/sliding_clipped_nav_bar.dart';
 
 var dashboardScaffoldKey = GlobalKey<ScaffoldState>();
@@ -28,13 +28,16 @@ class _DashboardState extends State<Dashboard> {
   final pageController = PageController();
   int selectedIndex = 0;
   bool pop = false;
+
   @override
   Widget build(BuildContext context) {
-    final bottomBarBgColor = context.theme.bottomNavigationBarTheme.backgroundColor;
+    final bottomBarBgColor =
+        context.theme.bottomNavigationBarTheme.backgroundColor;
     final systemOverlay = context.theme.appBarTheme.systemOverlayStyle;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: systemOverlay!.copyWith(systemNavigationBarColor: bottomBarBgColor),
+      value:
+          systemOverlay!.copyWith(systemNavigationBarColor: bottomBarBgColor),
       child: WillPopScope(
         onWillPop: () async {
           if (Platform.isIOS) {
@@ -43,7 +46,7 @@ class _DashboardState extends State<Dashboard> {
           if (pop) {
             return true;
           }
-          Fluttertoast.showToast(msg: 'Press again to exist the app');
+          Fluttertoast.showToast(msg: 'Press again to exit the app');
           pop = true;
           Timer(const Duration(seconds: 2), () {
             pop = false;
@@ -64,9 +67,9 @@ class _DashboardState extends State<Dashboard> {
             controller: pageController,
             children: const [
               HomeScreen(),
-              WishlistScreen(),
+              OrdersScreen(), // Replace WishlistScreen with OrdersScreen
               CartScreen(),
-              MyCardsScreen(),
+              ChatScreen(), // Replace MyCardsScreen with ChatScreen
             ],
           ),
           bottomNavigationBar: Column(
@@ -88,20 +91,24 @@ class _DashboardState extends State<Dashboard> {
                   selectedIndex: selectedIndex,
                   barItems: [
                     BarItem(
-                      icon: LazaIcons.home,
+                      icon:
+                          Icons.home, // Replace LazaIcons.home with Icons.home
                       title: 'Home',
                     ),
                     BarItem(
-                      icon: LazaIcons.heart,
-                      title: 'Wishlist',
+                      icon: Icons
+                          .chat, // Replace LazaIcons.wallet with Icons.chat
+                      title: 'Chat', // Replace My Cards with Chat
                     ),
                     BarItem(
-                      icon: LazaIcons.bag,
+                      icon: Icons
+                          .shopping_cart, // Replace LazaIcons.bag with Icons.shopping_cart
                       title: 'Cart',
                     ),
                     BarItem(
-                      icon: LazaIcons.wallet,
-                      title: 'My Cards',
+                      icon: Icons
+                          .shopping_bag, // Replace LazaIcons.heart with Icons.shopping_bag
+                      title: 'Orders', // Replace Wishlist with Orders
                     ),
                   ],
                 ),

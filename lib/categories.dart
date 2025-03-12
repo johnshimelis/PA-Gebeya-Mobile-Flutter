@@ -9,7 +9,9 @@ import 'package:laza/models/brand.dart';
 import 'package:laza/components/laza_icons.dart';
 
 class Categories extends StatelessWidget {
-  const Categories({super.key});
+  const Categories(
+      {super.key, required this.onCartUpdated}); // Add onCartUpdated
+  final VoidCallback onCartUpdated; // Non-nullable VoidCallback
 
   Future<List<AppCategory>> fetchCategories() async {
     final response = await http.get(
@@ -64,7 +66,10 @@ class Categories extends StatelessWidget {
                         mid,
                         (index) => Padding(
                           padding: const EdgeInsets.only(right: 4.0),
-                          child: CategoryTile(category: categories[index]),
+                          child: CategoryTile(
+                            category: categories[index],
+                            onCartUpdated: onCartUpdated, // Pass the callback
+                          ),
                         ),
                       ),
                     ),
@@ -77,8 +82,10 @@ class Categories extends StatelessWidget {
                         categories.length - mid,
                         (index) => Padding(
                           padding: const EdgeInsets.only(right: 4.0),
-                          child:
-                              CategoryTile(category: categories[index + mid]),
+                          child: CategoryTile(
+                            category: categories[index + mid],
+                            onCartUpdated: onCartUpdated, // Pass the callback
+                          ),
                         ),
                       ),
                     ),
@@ -126,8 +133,13 @@ class Headline extends StatelessWidget {
 }
 
 class CategoryTile extends StatelessWidget {
-  const CategoryTile({super.key, required this.category});
+  const CategoryTile({
+    super.key,
+    required this.category,
+    required this.onCartUpdated, // Add onCartUpdated
+  });
   final AppCategory category;
+  final VoidCallback onCartUpdated; // Non-nullable VoidCallback
 
   @override
   Widget build(BuildContext context) {
@@ -138,7 +150,11 @@ class CategoryTile extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (context) => BrandProductsScreen(brand: brand)),
+            builder: (context) => BrandProductsScreen(
+              brand: brand,
+              onCartUpdated: onCartUpdated, // Pass the callback
+            ),
+          ),
         );
       },
       borderRadius: const BorderRadius.all(Radius.circular(10.0)),

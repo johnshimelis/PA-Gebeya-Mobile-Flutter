@@ -10,10 +10,12 @@ import 'package:laza/components/colors.dart';
 import 'package:laza/components/drawer.dart';
 import 'package:laza/extensions/context_extension.dart';
 import 'package:laza/home_screen.dart';
-import 'package:laza/my_cards_screen.dart';
-import 'package:laza/orders_screen.dart'; // Add this import for OrdersScreen
-import 'package:laza/chat_screen.dart'; // Add this import for ChatScreen
+import 'package:laza/orders_screen.dart';
+import 'package:laza/chat_screen.dart';
 import 'package:sliding_clipped_nav_bar/sliding_clipped_nav_bar.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 var dashboardScaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -28,6 +30,79 @@ class _DashboardState extends State<Dashboard> {
   final pageController = PageController();
   int selectedIndex = 0;
   bool pop = false;
+
+  // State variables for counts
+  int cartItemCount = 0; // Initialize with 0
+  int orderCount = 0; // Initialize with 0
+  int chatCount = 0; // Initialize with 0 (if needed)
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch cart and order counts when the dashboard loads
+    fetchCartItemCount();
+    fetchOrderCount();
+  }
+
+  // Fetch cart item count
+  Future<void> fetchCartItemCount() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('token');
+    String? userId = prefs.getString('userId');
+
+    if (token == null || userId == null) {
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+            'https://pa-gebeya-backend.onrender.com/api/cart?userId=$userId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          cartItemCount = data['items'].length; // Update cart item count
+        });
+      }
+    } catch (error) {
+      debugPrint("Error fetching cart items: $error");
+    }
+  }
+
+  // Fetch order count
+  Future<void> fetchOrderCount() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('token');
+    String? userId = prefs.getString('userId');
+
+    if (token == null || userId == null) {
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+            'https://pa-gebeya-backend.onrender.com/api/users/orders/$userId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          orderCount = data['orders'].length; // Update order count
+        });
+      }
+    } catch (error) {
+      debugPrint("Error fetching orders: $error");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,19 +140,21 @@ class _DashboardState extends State<Dashboard> {
           body: PageView(
             physics: const NeverScrollableScrollPhysics(),
             controller: pageController,
-            children: const [
-              HomeScreen(),
-              OrdersScreen(), // Replace WishlistScreen with OrdersScreen
-              CartScreen(),
-              ChatScreen(), // Replace MyCardsScreen with ChatScreen
+            children: [
+              const HomeScreen(),
+              const ChatScreen(),
+              CartScreen(
+                onCartUpdated:
+                    fetchCartItemCount, // Pass callback to CartScreen
+              ),
+              const OrdersScreen(),
             ],
           ),
-          bottomNavigationBar: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                height: 56,
-                child: SlidingClippedNavBar(
+          bottomNavigationBar: SizedBox(
+            height: 70, // Adjust height as needed
+            child: Stack(
+              children: [
+                SlidingClippedNavBar(
                   backgroundColor: bottomBarBgColor ?? Colors.white,
                   onButtonPressed: (index) {
                     setState(() {
@@ -91,34 +168,73 @@ class _DashboardState extends State<Dashboard> {
                   selectedIndex: selectedIndex,
                   barItems: [
                     BarItem(
-                      icon:
-                          Icons.home, // Replace LazaIcons.home with Icons.home
+                      icon: Icons.home,
                       title: 'Home',
                     ),
                     BarItem(
-                      icon: Icons
-                          .chat, // Replace LazaIcons.wallet with Icons.chat
-                      title: 'Chat', // Replace My Cards with Chat
+                      icon: Icons.chat,
+                      title: 'Chat',
                     ),
                     BarItem(
-                      icon: Icons
-                          .shopping_cart, // Replace LazaIcons.bag with Icons.shopping_cart
+                      icon: Icons.shopping_cart,
                       title: 'Cart',
                     ),
                     BarItem(
-                      icon: Icons
-                          .shopping_bag, // Replace LazaIcons.heart with Icons.shopping_bag
-                      title: 'Orders', // Replace Wishlist with Orders
+                      icon: Icons.shopping_bag,
+                      title: 'Orders',
                     ),
                   ],
                 ),
-              ),
-              Container(
-                padding: EdgeInsets.only(bottom: context.bottomViewPadding),
-                color: bottomBarBgColor,
-              )
-            ],
+                // Badges for chat, cart, and orders
+                if (chatCount > 0)
+                  Positioned(
+                    top: 5,
+                    left: MediaQuery.of(context).size.width * 0.25 +
+                        20, // Adjusted to the right
+                    child: _buildBadge(chatCount),
+                  ),
+                if (cartItemCount > 0)
+                  Positioned(
+                    top: 5,
+                    left: MediaQuery.of(context).size.width * 0.6 +
+                        20, // Adjusted to the right
+                    child: _buildBadge(cartItemCount),
+                  ),
+                if (orderCount > 0)
+                  Positioned(
+                    top: 5,
+                    left: MediaQuery.of(context).size.width * 0.84 +
+                        20, // Adjusted to the right
+                    child: _buildBadge(orderCount),
+                  ),
+              ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // Helper method to build a badge
+  Widget _buildBadge(int count) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.red,
+        shape: BoxShape.circle, // Make the badge fully circular
+      ),
+      constraints: const BoxConstraints(
+        minWidth: 16,
+        minHeight: 16,
+      ),
+      child: Center(
+        child: Text(
+          count.toString(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+          ),
+          textAlign: TextAlign.center,
         ),
       ),
     );

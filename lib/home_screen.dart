@@ -10,11 +10,13 @@ import 'package:laza/search_screen.dart';
 import 'Ads.dart'; // Import the Ads widget
 import 'discountAds.dart'; // Import the DiscountAds widget
 import 'for_you.dart';
+import 'package:http/http.dart' as http;
 import 'discount.dart'; // Import the DiscountScreen widget
 import 'categories.dart'; // Import the categories.dart widget
 import 'bestseller.dart'; // Import BestsellerScreen
 import 'forYouAds.dart';
 import 'sign_in_with_phone_number.dart'; // Import the sign-in screen
+import 'notifications.dart';
 
 // Helper function to check if the user is logged in
 Future<bool> isUserLoggedIn() async {
@@ -96,6 +98,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool isLoggedIn = false;
+  int notificationCount = 3; // Example: Set the notification count
 
   @override
   void initState() {
@@ -119,7 +122,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(kToolbarHeight),
-        child: HomeAppBar(isLoggedIn: isLoggedIn),
+        child: HomeAppBar(
+          isLoggedIn: isLoggedIn,
+          notificationCount: notificationCount, // Pass the notification count
+        ),
       ),
       body: SafeArea(
         child: ListView(
@@ -189,7 +195,9 @@ class _HomeScreenState extends State<HomeScreen> {
             Ads(), // Horizontal auto-scrolling ads
             const SizedBox(height: 20.0),
 
-            Categories(), // Categories widget (from categories.dart)
+            Categories(
+              onCartUpdated: fetchCartItemCount, // Pass the callback
+            ), // Categories widget (from categories.dart)
             const SizedBox(height: 20.0),
 
             // Bestseller Section
@@ -228,12 +236,44 @@ class _HomeScreenState extends State<HomeScreen> {
           FloatingActionButtonLocation.endFloat, // Position at the bottom right
     );
   }
+
+  // Method to fetch cart item count
+  Future<void> fetchCartItemCount() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('token');
+    String? userId = prefs.getString('userId');
+
+    if (token == null || userId == null) {
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+            'https://pa-gebeya-backend.onrender.com/api/cart?userId=$userId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          // Update cart item count in the Dashboard or other screens
+        });
+      }
+    } catch (error) {
+      debugPrint("Error fetching cart items: $error");
+    }
+  }
 }
 
 class HomeAppBar extends StatelessWidget {
   final bool isLoggedIn;
+  final int notificationCount; // Add a notification count
 
-  const HomeAppBar({super.key, required this.isLoggedIn});
+  const HomeAppBar(
+      {super.key, required this.isLoggedIn, this.notificationCount = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -274,33 +314,75 @@ class HomeAppBar extends StatelessWidget {
         ],
       ),
       actions: [
-        InkWell(
-          borderRadius: const BorderRadius.all(Radius.circular(50)),
-          onTap: () {
-            if (isLoggedIn) {
-              // Navigate to notifications screen
-              // Navigator.push(context, MaterialPageRoute(builder: (context) => const NotificationsScreen()));
-            } else {
-              // Navigate to sign-in screen
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SignInWithPhoneNumber(),
+        // Notification Icon with Badge
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            InkWell(
+              borderRadius: const BorderRadius.all(Radius.circular(50)),
+              onTap: () {
+                if (isLoggedIn) {
+                  // Navigate to notifications screen (without const)
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          NotificationsScreen(), // Removed const
+                    ),
+                  );
+                } else {
+                  // Navigate to sign-in screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SignInWithPhoneNumber(),
+                    ),
+                  );
+                }
+              },
+              child: Ink(
+                width: 45,
+                height: 45,
+                decoration: ShapeDecoration(
+                  color: context.theme.cardColor,
+                  shape: const CircleBorder(),
                 ),
-              );
-            }
-          },
-          child: Ink(
-            width: 45,
-            height: 45,
-            decoration: ShapeDecoration(
-              color: context.theme.cardColor,
-              shape: const CircleBorder(),
+                child: Icon(
+                  isLoggedIn
+                      ? Icons.notifications
+                      : Icons.login, // Material icons
+                ),
+              ),
             ),
-            child: Icon(
-              isLoggedIn ? Icons.notifications : Icons.login, // Material icons
-            ),
-          ),
+            // Badge for Notifications
+            if (notificationCount >
+                0) // Only show badge if there are notifications
+              Positioned(
+                top: -5,
+                right: -5,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle, // Make the badge fully circular
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: Center(
+                    child: Text(
+                      notificationCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(width: 15),
       ],

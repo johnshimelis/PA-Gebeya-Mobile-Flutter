@@ -203,9 +203,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 child: InkWell(
                   borderRadius: const BorderRadius.all(Radius.circular(50)),
                   onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const CartScreen())),
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CartScreen(
+                        onCartUpdated: () {
+                          // Callback to refresh cart count
+                          // You can implement this logic in the parent widget
+                        },
+                      ),
+                    ),
+                  ),
                   child: Ink(
                     width: 45,
                     height: 45,

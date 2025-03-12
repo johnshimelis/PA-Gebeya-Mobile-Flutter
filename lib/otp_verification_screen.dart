@@ -139,6 +139,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         debugPrint("✅ User logged in successfully: $user");
         debugPrint("✅ Stored userId: ${prefs.getString('userId')}");
         debugPrint("✅ Stored token: ${prefs.getString('token')}");
+        debugPrint("✅ Stored fullName: ${user['fullName']}");
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('OTP Verified Successfully!')),
@@ -177,7 +178,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     });
 
     debugPrint("🚪 User logged out!");
-    Navigator.pushReplacementNamed(context, '/login');
+    Navigator.pushReplacementNamed(context, '/sign_in_with_phone_number');
   }
 
   @override

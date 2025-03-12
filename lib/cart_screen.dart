@@ -13,7 +13,9 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:laza/checkout_screen.dart';
 
 class CartScreen extends StatefulWidget {
-  const CartScreen({super.key});
+  const CartScreen(
+      {super.key, required this.onCartUpdated}); // Non-nullable VoidCallback
+  final VoidCallback onCartUpdated; // Non-nullable VoidCallback
 
   @override
   _CartScreenState createState() => _CartScreenState();
@@ -81,6 +83,18 @@ class _CartScreenState extends State<CartScreen> {
       total += (item['price'] * item['quantity']);
     }
     return total;
+  }
+
+  /// Logs order details from SharedPreferences
+  Future<void> logOrderDetails() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? storedOrderDetails = prefs.getString('checkoutData');
+
+    if (storedOrderDetails != null) {
+      debugPrint("🛒 Order Details in SharedPreferences: $storedOrderDetails");
+    } else {
+      debugPrint("⚠️ No order details found in SharedPreferences.");
+    }
   }
 
   Future<void> updateQuantity(String productId, bool increase) async {
@@ -168,6 +182,9 @@ class _CartScreenState extends State<CartScreen> {
           });
         }
 
+        // Notify the Dashboard of the cart update
+        widget.onCartUpdated();
+
         debugPrint("✅ Quantity updated to $newQuantity in the UI");
 
         // Show toast for successful update
@@ -238,6 +255,9 @@ class _CartScreenState extends State<CartScreen> {
           });
         }
 
+        // Notify the Dashboard of the cart update
+        widget.onCartUpdated();
+
         debugPrint("✅ Item removed from the UI");
 
         // Fetch updated cart data from the backend
@@ -281,19 +301,75 @@ class _CartScreenState extends State<CartScreen> {
         appBar: const CustomAppBar(title: 'Cart'),
         bottomNavigationBar: BottomNavButton(
           label: 'Checkout',
-          onTap: () async {
-            // Store cart items and total amount in SharedPreferences
-            SharedPreferences prefs = await SharedPreferences.getInstance();
-            prefs.setString(
-                'cartItems', jsonEncode(cartItems)); // Store cart items as JSON
-            prefs.setDouble('totalAmount', totalAmount); // Store total amount
+          onTap: cartItems.isEmpty
+              ? null // Disable button if cart is empty
+              : () async {
+                  try {
+                    // Retrieve user details from SharedPreferences
+                    SharedPreferences prefs =
+                        await SharedPreferences.getInstance();
+                    String? userJson = prefs.getString('userData');
 
-            // Navigate to the CheckoutScreen
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CheckoutScreen()),
-            );
-          },
+                    if (userJson == null) {
+                      Fluttertoast.showToast(
+                        msg: "User data not found. Please log in again.",
+                        toastLength: Toast.LENGTH_SHORT,
+                        gravity: ToastGravity.TOP,
+                        backgroundColor: Colors.red,
+                        textColor: Colors.white,
+                      );
+                      return;
+                    }
+
+                    Map<String, dynamic> userData = jsonDecode(userJson);
+                    String? userId = userData['userId'];
+                    String? fullName = userData['fullName'] ?? 'Unknown User';
+
+                    Map<String, dynamic> checkoutData = {
+                      'amount': totalAmount.toStringAsFixed(2),
+                      'userId': userId,
+                      'fullName': fullName,
+                      'avatar': "/uploads/default-avatar.png",
+                      'status': "Pending",
+                      'orderDetails': cartItems.map((item) {
+                        String productId;
+                        try {
+                          productId = item['productId'] is String
+                              ? item['productId']
+                              : item['productId']['_id'];
+                        } catch (e) {
+                          productId = 'unknown';
+                        }
+
+                        return {
+                          'price': item['price'],
+                          'product': item['productName'],
+                          'productId': productId,
+                          'productImage': item['img'],
+                          'quantity': item['quantity'],
+                        };
+                      }).toList(),
+                    };
+
+                    prefs.setString('checkoutData', jsonEncode(checkoutData));
+                    debugPrint(jsonEncode(checkoutData));
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CheckoutScreen()),
+                    );
+                  } catch (e) {
+                    debugPrint("⚠️ Error during checkout: $e");
+                    Fluttertoast.showToast(
+                      msg:
+                          "An error occurred during checkout. Please try again.",
+                      toastLength: Toast.LENGTH_SHORT,
+                      gravity: ToastGravity.TOP,
+                      backgroundColor: Colors.red,
+                      textColor: Colors.white,
+                    );
+                  }
+                },
         ),
         body: isLoading
             ? const Center(child: CircularProgressIndicator())

@@ -5,7 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'order_detail_screen.dart'; // Import the OrderDetailScreen
 
 class OrdersScreen extends StatefulWidget {
-  const OrdersScreen({super.key});
+  final VoidCallback onOrderUpdated; // Add this callback
+
+  const OrdersScreen({super.key, required this.onOrderUpdated});
 
   @override
   _OrdersScreenState createState() => _OrdersScreenState();
@@ -105,6 +107,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
           orders =
               orders.where((order) => order['orderId'] != orderId).toList();
         });
+        widget
+            .onOrderUpdated(); // Trigger the callback to update the order count
       }
     } catch (error) {
       print('Error deleting order: $error');
@@ -123,20 +127,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
   TextStyle getStatusStyle(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return const TextStyle(
-            color: Colors.orange, fontWeight: FontWeight.bold);
+        return TextStyle(color: Colors.orange, fontWeight: FontWeight.bold);
       case 'cancelled':
       case 'un-paid':
-        return const TextStyle(color: Colors.red, fontWeight: FontWeight.bold);
+        return TextStyle(color: Colors.red, fontWeight: FontWeight.bold);
       case 'approved':
       case 'delivered':
       case 'paid':
-        return const TextStyle(
-            color: Colors.green, fontWeight: FontWeight.bold);
+        return TextStyle(color: Colors.green, fontWeight: FontWeight.bold);
       case 'processing':
-        return const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold);
+        return TextStyle(color: Colors.grey, fontWeight: FontWeight.bold);
       default:
-        return const TextStyle(color: Colors.black);
+        return TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color);
     }
   }
 
@@ -144,13 +146,35 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Orders'),
+        title: Text(
+          'Orders',
+          style: TextStyle(
+            color: Theme.of(context)
+                .textTheme
+                .headlineSmall
+                ?.color, // Use headlineSmall for title
+          ),
+        ),
         centerTitle: true,
+        elevation: 0,
+        iconTheme: IconThemeData(
+          color: Theme.of(context).iconTheme.color, // Use theme icon color
+        ),
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: CircularProgressIndicator(
+                color: Theme.of(context).primaryColor,
+              ),
+            )
           : orders.isEmpty
-              ? const Center(child: Text('No orders found.'))
+              ? Center(
+                  child: Text(
+                    'No orders found.',
+                    style: TextStyle(
+                        fontSize: 16, color: Theme.of(context).hintColor),
+                  ),
+                )
               : ListView.builder(
                   padding: const EdgeInsets.all(16.0),
                   itemCount: orders.length,
@@ -158,15 +182,28 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     final order = orders[index];
                     return Card(
                       margin: const EdgeInsets.only(bottom: 16.0),
+                      color: Theme.of(context).cardColor,
                       child: ListTile(
-                        leading:
-                            const Icon(Icons.shopping_bag, color: Colors.blue),
-                        title: Text('Order #${order['orderId']}'),
+                        leading: Icon(Icons.shopping_bag,
+                            color: Theme.of(context).primaryColor),
+                        title: Text(
+                          'Order #${order['orderId']}',
+                          style: TextStyle(
+                              color:
+                                  Theme.of(context).textTheme.bodyLarge?.color),
+                        ),
                         subtitle: RichText(
                           text: TextSpan(
                             style: DefaultTextStyle.of(context).style,
                             children: <TextSpan>[
-                              const TextSpan(text: 'Status: '),
+                              TextSpan(
+                                text: 'Status: ',
+                                style: TextStyle(
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.color),
+                              ),
                               TextSpan(
                                 text: order['status'],
                                 style: getStatusStyle(order['status']),
@@ -178,11 +215,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.visibility),
+                              icon: Icon(Icons.visibility,
+                                  color: Theme.of(context).iconTheme.color),
                               onPressed: () => handleViewDetails(order),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete),
+                              icon: Icon(Icons.delete,
+                                  color: Theme.of(context).colorScheme.error),
                               onPressed: () => handleDelete(order['orderId']),
                             ),
                           ],

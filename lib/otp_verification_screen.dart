@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dashboard.dart';
+import 'package:laza/dashboard.dart'; // Ensure this import is correct
 
 class OtpVerificationScreen extends StatefulWidget {
   final String phoneNumber;
@@ -116,6 +116,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       );
 
       final responseBody = json.decode(response.body);
+      debugPrint("API Response: ${response.body}"); // Log the API response
 
       if (response.statusCode == 200 &&
           responseBody['message'] == 'Login successful') {
@@ -145,11 +146,15 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           const SnackBar(content: Text('OTP Verified Successfully!')),
         );
 
-        // Navigate to Dashboard
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => Dashboard()),
-        );
+        // Navigate to Dashboard using named route
+        try {
+          Navigator.pushReplacementNamed(context, '/dashboard');
+        } catch (e) {
+          debugPrint("❌ Navigation Error: $e");
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to navigate to Dashboard.')),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('OTP verification failed!')),

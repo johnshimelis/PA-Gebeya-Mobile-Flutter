@@ -6,15 +6,25 @@ class LoadingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor:
+          Theme.of(context).colorScheme.background, // Set background color
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(),
+            CircularProgressIndicator(
+              color: Theme.of(context)
+                  .colorScheme
+                  .primary, // Use theme primary color
+            ),
             const SizedBox(height: 20),
             Text(
               'Submitting Order...',
-              style: Theme.of(context).textTheme.titleLarge,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onBackground, // Use theme text color
+                  ),
             ),
           ],
         ),

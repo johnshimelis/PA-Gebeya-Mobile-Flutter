@@ -168,18 +168,33 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             controller: emailCtrl,
                             labelText: 'Email',
                             keyboardType: TextInputType.emailAddress,
-                            validator: (val) => val == null || val.isEmpty
-                                ? 'Field is required'
-                                : null,
+                            validator: (val) {
+                              if (val == null || val.isEmpty) {
+                                return 'Field is required';
+                              }
+                              // Validate email format
+                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                  .hasMatch(val)) {
+                                return 'Enter a valid email address';
+                              }
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 10),
                           CustomTextField(
                             controller: phoneCtrl,
                             labelText: 'Phone Number',
                             keyboardType: TextInputType.phone,
-                            validator: (val) => val == null || val.isEmpty
-                                ? 'Field is required'
-                                : null,
+                            validator: (val) {
+                              if (val == null || val.isEmpty) {
+                                return 'Field is required';
+                              }
+                              // Validate phone number format (10 digits)
+                              if (!RegExp(r'^[0-9]{10}$').hasMatch(val)) {
+                                return 'Enter a valid 10-digit phone number';
+                              }
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 10),
                           CustomTextField(
@@ -187,9 +202,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             labelText: 'Password',
                             obscureText: true,
                             keyboardType: TextInputType.visiblePassword,
-                            validator: (val) => val == null || val.isEmpty
-                                ? 'Field is required'
-                                : null,
+                            validator: (val) {
+                              if (val == null || val.isEmpty) {
+                                return 'Field is required';
+                              }
+                              // Validate password length (minimum 8 characters)
+                              if (val.length < 8) {
+                                return 'Password must be at least 8 characters';
+                              }
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 10),
                           SwitchListTile.adaptive(

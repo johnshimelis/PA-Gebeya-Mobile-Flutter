@@ -47,61 +47,6 @@ class SignInScreen extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Facebook SignInButton with custom border radius
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: SignInButton(
-                          Buttons.facebook,
-                          onPressed: () {
-                            Navigator.pushAndRemoveUntil(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => const Dashboard()),
-                              (Route<dynamic> route) => false,
-                            );
-                          },
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                                12), // Apply border radius
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Twitter SignInButton with custom border radius
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: SignInButton(
-                          Buttons.twitter,
-                          onPressed: () {},
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                                12), // Apply border radius
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Google SignInButton with custom border radius
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: SignInButton(
-                          Buttons.googleDark,
-                          onPressed: () {},
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                                12), // Apply border radius
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
                       // Sign in with Phone Button (kept as is)
                       SizedBox(
                         width: double.infinity,

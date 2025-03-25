@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:laza/components/bottom_nav_button.dart';
-import 'package:laza/components/colors.dart';
 import 'package:laza/extensions/context_extension.dart';
 import 'package:laza/models/index.dart';
 import 'package:laza/theme.dart';
@@ -8,7 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:http_parser/http_parser.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:async';
 
 import 'cart_screen.dart';
 
@@ -20,30 +20,138 @@ class ProductDetailsScreen extends StatefulWidget {
   State<ProductDetailsScreen> createState() => _ProductDetailsScreenState();
 }
 
-class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
+class _ProductDetailsScreenState extends State<ProductDetailsScreen>
+    with SingleTickerProviderStateMixin {
   late String selectedImage;
-  int quantity = 1; // Track quantity in the product details screen
+  int quantity = 1;
+  List<Product> relatedProducts = [];
+  bool isLoadingRelated = false;
+  late AnimationController _animationController;
+  final Map<String, PageController> _pageControllers = {};
+  final Map<String, Timer> _timers = {};
 
   @override
   void initState() {
-    selectedImage = widget.product.thumbnailPath;
     super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+
+    selectedImage =
+        widget.product.images?.first ?? widget.product.thumbnailPath ?? '';
+    fetchRelatedProducts();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    for (var controller in _pageControllers.values) {
+      controller.dispose();
+    }
+    for (var timer in _timers.values) {
+      timer.cancel();
+    }
+    super.dispose();
+  }
+
+  void _startAutoScroll(String productId, int imageCount) {
+    _timers[productId] = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (_pageControllers[productId]!.hasClients) {
+        if (_pageControllers[productId]!.page ==
+            (_pageControllers[productId]!.position.maxScrollExtent / 200)
+                .floor()) {
+          _pageControllers[productId]!.animateToPage(
+            0,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+          );
+        } else {
+          _pageControllers[productId]!.nextPage(
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+          );
+        }
+      }
+    });
+  }
+
+  Future<void> fetchRelatedProducts() async {
+    // Check if category is an object with _id or just a string ID
+    String? categoryId;
+    if (widget.product.category is Map<String, dynamic>) {
+      categoryId = (widget.product.category as Map<String, dynamic>)['_id'];
+    } else if (widget.product.categoryId != null) {
+      categoryId = widget.product.categoryId;
+    } else {
+      debugPrint("No valid category ID available for the product.");
+      return;
+    }
+
+    setState(() {
+      isLoadingRelated = true;
+    });
+
+    try {
+      debugPrint("Fetching related products for category: $categoryId");
+      final response = await http.get(
+        Uri.parse(
+            'https://pa-gebeya-backend.onrender.com/api/products/category/$categoryId'),
+      );
+
+      debugPrint("API Response: ${response.statusCode}");
+      debugPrint("Response body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        final productsData = responseData is List
+            ? responseData
+            : responseData['products'] ?? [];
+
+        debugPrint("Products data: $productsData");
+
+        final filteredProducts = (productsData as List)
+            .where((p) => p['_id'] != widget.product.id)
+            .map((p) => Product.fromJson(p))
+            .toList();
+
+        debugPrint("Filtered products: ${filteredProducts.length}");
+        setState(() {
+          relatedProducts = filteredProducts;
+        });
+      } else {
+        throw Exception(
+            'Failed to load related products: ${response.statusCode}');
+      }
+    } catch (error) {
+      debugPrint('Error fetching related products: $error');
+      Fluttertoast.showToast(
+        msg: "Failed to load related products",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.TOP,
+      );
+      setState(() {
+        relatedProducts = [];
+      });
+    } finally {
+      setState(() {
+        isLoadingRelated = false;
+      });
+    }
   }
 
   Future<void> addToCart(Product product) async {
     debugPrint("🟢 addToCart called for product: ${product.id}");
 
-    // Ensure product ID is valid
     if (product.id == null || product.id!.isEmpty) {
       debugPrint("🚨 Error: Product ID is null or empty!");
       showToast("Error: Product ID is missing", error: true);
       return;
     }
 
-    // Directly access the token from user data
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('token');
-    String? userId = prefs.getString('userId'); // Ensure userId is not null
+    String? userId = prefs.getString('userId');
 
     if (token == null || token.isEmpty) {
       debugPrint("🚨 Error: Token is missing or expired!");
@@ -58,37 +166,19 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     }
 
     final url = Uri.parse('https://pa-gebeya-backend.onrender.com/api/cart');
-
-    // Create a multipart request
     var request = http.MultipartRequest('POST', url);
-
-    // Add headers
     request.headers['Authorization'] = 'Bearer $token';
 
-    // Add fields to the request
     request.fields['userId'] = userId;
     request.fields['productId'] = product.id!;
     request.fields['productName'] = product.title;
     request.fields['price'] = product.price.toString();
-    request.fields['quantity'] =
-        quantity.toString(); // Use the quantity from the state
+    request.fields['quantity'] = quantity.toString();
 
-    // Add image URL as a field (if available)
-    if (product.thumbnailPath != null && product.thumbnailPath!.isNotEmpty) {
-      request.fields['img'] =
-          product.thumbnailPath!; // Send the image URL directly
-      debugPrint("🟢 Image URL added to request: ${product.thumbnailPath}");
-    } else {
-      debugPrint("🚨 Warning: Product image is missing!");
+    if (product.images != null && product.images!.isNotEmpty) {
+      request.fields['img'] = product.images!.first;
+      debugPrint("🟢 Image URL added to request: ${product.images!.first}");
     }
-
-    // Log all fields being added to the request
-    debugPrint("📌 Request Fields:");
-    request.fields.forEach((key, value) {
-      debugPrint("$key: $value");
-    });
-
-    debugPrint("🔹 Sending request to: $url");
 
     try {
       final response = await request.send();
@@ -111,7 +201,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     }
   }
 
-  // Show toast messages
   void showToast(String message, {bool error = false}) {
     Fluttertoast.showToast(
       msg: message,
@@ -120,8 +209,31 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       backgroundColor: error ? Colors.red : Colors.green,
       textColor: Colors.white,
       fontSize: 16.0,
-      timeInSecForIosWeb: 3,
     );
+  }
+
+  Widget buildRatingStars(double rating) {
+    int fullStars = rating.floor();
+    bool hasHalfStar = (rating - fullStars) >= 0.5;
+
+    return Row(
+      children: List.generate(5, (index) {
+        if (index < fullStars) {
+          return Icon(Icons.star, size: 16, color: Colors.yellow);
+        } else if (hasHalfStar && index == fullStars) {
+          return Icon(Icons.star_half, size: 16, color: Colors.yellow);
+        } else {
+          return Icon(Icons.star, size: 16, color: Colors.grey);
+        }
+      }),
+    );
+  }
+
+  String formatSoldCount(int? sold) {
+    final soldCount = sold ?? 0;
+    if (soldCount == 0) return '0 sold';
+    if (soldCount < 10) return '$soldCount sold';
+    return '${(soldCount ~/ 10) * 10}+ sold';
   }
 
   @override
@@ -129,6 +241,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     final product = widget.product;
     final bottomPadding =
         context.bottomViewPadding == 0.0 ? 30.0 : context.bottomViewPadding;
+
+    // Check if category is an object with _id or just a string
+    final categoryId = product.category is Map<String, dynamic>
+        ? (product.category as Map<String, dynamic>)['_id']
+        : product.categoryId;
+    final categoryName = product.category is Map<String, dynamic>
+        ? (product.category as Map<String, dynamic>)['name'] ?? 'Category'
+        : product.category ?? 'Category';
+
     return Scaffold(
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
@@ -144,9 +265,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Total Price', style: context.bodyMediumW600),
-                    Text('with VAT,SD',
-                        style: context.bodyExtraSmall
-                            ?.copyWith(color: ColorConstant.manatee)),
                   ],
                 ),
                 Text(
@@ -157,8 +275,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           ),
           BottomNavButton(
             label: 'Add to Cart',
-            onTap: () => addToCart(
-                widget.product), // Call addToCart when the button is pressed
+            onTap: () => addToCart(widget.product),
           ),
         ],
       ),
@@ -194,8 +311,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     color: AppTheme.lightTheme.cardColor,
                     shape: const CircleBorder(),
                   ),
-                  child: const Icon(Icons
-                      .favorite_border), // Replaced LazaIcons.heart with Icons.favorite_border
+                  child: const Icon(Icons.favorite_border),
                 ),
               ),
               Padding(
@@ -206,10 +322,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => CartScreen(
-                        onCartUpdated: () {
-                          // Callback to refresh cart count
-                          // You can implement this logic in the parent widget
-                        },
+                        onCartUpdated: () {},
                       ),
                     ),
                   ),
@@ -220,10 +333,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       color: AppTheme.lightTheme.cardColor,
                       shape: const CircleBorder(),
                     ),
-                    child: const Icon(
-                      Icons
-                          .shopping_cart, // Replaced LazaIcons.bag with Icons.shopping_cart
-                    ),
+                    child: const Icon(Icons.shopping_cart),
                   ),
                 ),
               ),
@@ -233,135 +343,109 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             expandedHeight: 400,
             flexibleSpace: FlexibleSpaceBar(
               background: SafeArea(
-                  child: Image.network(
-                selectedImage,
-                fit: BoxFit.fitHeight,
-              )),
-            ),
-            systemOverlayStyle:
-                context.theme.appBarTheme.systemOverlayStyle!.copyWith(
-              statusBarIconBrightness: Brightness.dark,
-              statusBarBrightness: Brightness.light,
+                child: Image.network(
+                  selectedImage,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const Icon(Icons.image_not_supported, size: 100),
+                ),
+              ),
             ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
           SliverToBoxAdapter(
-              child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Flexible(
-                  child: Column(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(categoryName, style: context.bodySmall),
+                        const SizedBox(height: 5.0),
+                        Text(
+                          product.title,
+                          style: context.headlineSmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(product.category ?? 'Men\'s Printed Pullover Hoodie',
-                          style: context.bodySmall),
+                      Text('Price', style: context.bodySmall),
                       const SizedBox(height: 5.0),
                       Text(
-                        product.title,
+                        product.price,
                         style: context.headlineSmall,
                       ),
                     ],
                   ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Price', style: context.bodySmall),
-                    const SizedBox(height: 5.0),
-                    Text(
-                      product.price,
-                      style: context.headlineSmall,
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
-          )),
+          ),
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
-          if (widget.product.images != null)
+          if (widget.product.images != null &&
+              widget.product.images!.isNotEmpty)
             SliverToBoxAdapter(
               child: SizedBox(
                 height: 80,
                 width: double.infinity,
                 child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                    physics: const BouncingScrollPhysics(),
-                    scrollDirection: Axis.horizontal,
-                    itemBuilder: (context, index) {
-                      final image = widget.product.images![index];
-                      return InkWell(
-                        onTap: () => setState(() => selectedImage = image),
-                        child: Ink(
-                          height: double.infinity,
-                          width: 80,
-                          decoration: BoxDecoration(
-                            image: DecorationImage(image: AssetImage(image)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  physics: const BouncingScrollPhysics(),
+                  scrollDirection: Axis.horizontal,
+                  itemBuilder: (context, index) {
+                    final image = widget.product.images![index];
+                    return InkWell(
+                      onTap: () => setState(() => selectedImage = image),
+                      child: Ink(
+                        height: double.infinity,
+                        width: 80,
+                        decoration: BoxDecoration(
+                          image: DecorationImage(
+                            image: NetworkImage(image),
+                            fit: BoxFit.cover,
                           ),
                         ),
-                      );
-                    },
-                    separatorBuilder: (_, __) => const SizedBox(width: 10.0),
-                    itemCount: widget.product.images!.length),
+                      ),
+                    );
+                  },
+                  separatorBuilder: (_, __) => const SizedBox(width: 10.0),
+                  itemCount: widget.product.images!.length,
+                ),
               ),
             ),
           const SliverToBoxAdapter(child: SizedBox(height: 5)),
-          // ============================================================
-          // Size Guide
           SliverToBoxAdapter(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Size',
-                        style: context.bodyLargeW600,
-                      ),
-                      TextButton(
-                          onPressed: () {},
-                          child: Text('Size Guide',
-                              style: context.bodyMedium?.copyWith(
-                                  color: context.theme.primaryColor))),
-                    ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 10.0),
+                  Text(
+                    product.shortDescription ??
+                        'No short description available',
+                    style: context.bodyMedium?.copyWith(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                SizedBox(
-                  height: 70,
-                  width: double.infinity,
-                  child: ListView.separated(
-                      separatorBuilder: (_, __) => const SizedBox(width: 10.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                      physics: const BouncingScrollPhysics(),
-                      scrollDirection: Axis.horizontal,
-                      itemCount: 5,
-                      itemBuilder: (context, index) {
-                        final text = ['S', 'M', 'L', 'XL', 'XXL'][index];
-                        return Container(
-                          height: 70,
-                          width: 70,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: context.theme.cardColor,
-                            borderRadius:
-                                const BorderRadius.all(Radius.circular(10.0)),
-                          ),
-                          child: Text(
-                            text,
-                            style: context.bodyLargeW600,
-                          ),
-                        );
-                      }),
-                )
-              ],
+                  const SizedBox(height: 8.0),
+                  if (product.fullDescription != null)
+                    Text(
+                      product.fullDescription!,
+                      style: context.bodyMedium?.copyWith(color: Colors.grey),
+                    ),
+                  const SizedBox(height: 20.0),
+                ],
+              ),
             ),
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 20)),
-          // ============================================================
-          // Quantity Section
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
@@ -415,26 +499,249 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
-          // ============================================================
-          // Description
-          if (product.description != null)
-            SliverToBoxAdapter(
-                child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Description', style: context.bodyLargeW600),
-                  const SizedBox(height: 10.0),
-                  Text(product.description!,
-                      style: context.bodyMedium
-                          ?.copyWith(color: ColorConstant.manatee)),
-                  const SizedBox(height: 20.0),
+                  Text(
+                    'Related Products',
+                    style: context.bodyLargeW600,
+                  ),
+                  const SizedBox(height: 10),
+                  isLoadingRelated
+                      ? const Center(child: CircularProgressIndicator())
+                      : relatedProducts.isEmpty
+                          ? Column(
+                              children: [
+                                const Text('No related products found.'),
+                              ],
+                            )
+                          : GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 8.0,
+                                mainAxisSpacing: 10.0,
+                                childAspectRatio: 0.7,
+                              ),
+                              itemCount: relatedProducts.length,
+                              itemBuilder: (context, index) {
+                                final relatedProduct = relatedProducts[index];
+
+                                if (!_pageControllers
+                                    .containsKey(relatedProduct.id!)) {
+                                  _pageControllers[relatedProduct.id!] =
+                                      PageController();
+                                  _startAutoScroll(relatedProduct.id!,
+                                      relatedProduct.images?.length ?? 1);
+                                }
+
+                                return GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            ProductDetailsScreen(
+                                          product: relatedProduct,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Card(
+                                    elevation: 3,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    margin: const EdgeInsets.all(0),
+                                    child: Stack(
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.all(6.0),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              SizedBox(
+                                                height: 120,
+                                                child: PageView.builder(
+                                                  controller: _pageControllers[
+                                                      relatedProduct.id],
+                                                  itemCount: relatedProduct
+                                                          .images?.length ??
+                                                      1,
+                                                  itemBuilder:
+                                                      (context, imageIndex) {
+                                                    return ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              8),
+                                                      child: Image.network(
+                                                        relatedProduct.images?[
+                                                                imageIndex] ??
+                                                            relatedProduct
+                                                                .thumbnailPath!,
+                                                        height: 120,
+                                                        width: double.infinity,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (context,
+                                                            error, stackTrace) {
+                                                          return const Icon(
+                                                              Icons
+                                                                  .image_not_supported,
+                                                              size: 100);
+                                                        },
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 3),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.yellow,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              4),
+                                                    ),
+                                                    child: Text(
+                                                      '$categoryName Product',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: Colors.black,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Expanded(
+                                                    child: Text(
+                                                      relatedProduct.title,
+                                                      style: TextStyle(
+                                                        fontSize: 14,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: Theme.of(context)
+                                                                    .brightness ==
+                                                                Brightness.dark
+                                                            ? Colors.white
+                                                            : Colors.black,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                relatedProduct
+                                                        .shortDescription ??
+                                                    'No description available',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey,
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Row(
+                                                children: [
+                                                  buildRatingStars(
+                                                      relatedProduct.rating ??
+                                                          0),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    '| ${relatedProduct.rating ?? 0}',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    '| ${formatSoldCount(relatedProduct.sold)}',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                'ETB ${relatedProduct.price}',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.blue,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        if (relatedProduct.videoLink != null &&
+                                            relatedProduct
+                                                .videoLink!.isNotEmpty)
+                                          Positioned(
+                                            top: 8,
+                                            right: 8,
+                                            child: GestureDetector(
+                                              onTap: () {
+                                                launchUrl(Uri.parse(
+                                                    relatedProduct.videoLink!));
+                                              },
+                                              child: RotationTransition(
+                                                turns: _animationController,
+                                                child: Container(
+                                                  padding:
+                                                      const EdgeInsets.all(6),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    shape: BoxShape.circle,
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: Colors.black
+                                                            .withOpacity(0.2),
+                                                        blurRadius: 4,
+                                                        offset:
+                                                            const Offset(0, 2),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons
+                                                        .tiktok, // Changed from Icons.music_note to Icons.tiktok
+                                                    color: Colors.black,
+                                                    size: 20,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                 ],
               ),
-            )),
-          // ============================================================
-          // Bottom padding
+            ),
+          ),
           SliverToBoxAdapter(child: SizedBox(height: bottomPadding)),
         ],
       ),

@@ -6,7 +6,7 @@ import 'package:laza/intro_screen.dart';
 import 'package:laza/theme.dart';
 import 'package:provider/provider.dart';
 import 'colors.dart';
-import 'laza_icons.dart';
+import 'package:laza/sign_in_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DrawerWidget extends StatelessWidget {
@@ -71,7 +71,7 @@ class DrawerWidget extends StatelessWidget {
     // After clearing, navigate to the IntroductionScreen (or login screen)
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => const IntroductionScreen()),
+      MaterialPageRoute(builder: (context) => const SignInScreen()),
       (Route<dynamic> route) => false,
     );
   }
@@ -116,7 +116,8 @@ class DrawerWidget extends StatelessWidget {
                                 color: context.theme.cardColor,
                                 shape: const CircleBorder(),
                               ),
-                              child: const Icon(LazaIcons.menu_vertical),
+                              child:
+                                  const Icon(Icons.more_vert), // Material Icon
                             ),
                           ),
                           Padding(
@@ -167,7 +168,7 @@ class DrawerWidget extends StatelessWidget {
                                           ),
                                           const SizedBox(width: 5.0),
                                           const Icon(
-                                            LazaIcons.verified_badge,
+                                            Icons.verified, // Material Icon
                                             size: 15,
                                             color: Colors.green,
                                           ),
@@ -202,7 +203,7 @@ class DrawerWidget extends StatelessWidget {
                         case ThemeMode.system:
                           iconData = Icons.brightness_auto_outlined;
                         case ThemeMode.light:
-                          iconData = LazaIcons.sun;
+                          iconData = Icons.light_mode; // Material Icon
                         case ThemeMode.dark:
                           iconData = Icons.dark_mode_outlined;
                       }
@@ -234,7 +235,7 @@ class DrawerWidget extends StatelessWidget {
                       );
                     }),
                     ListTile(
-                      leading: const Icon(LazaIcons.info_circle),
+                      leading: const Icon(Icons.info_outline), // Material Icon
                       onTap: () {},
                       contentPadding:
                           const EdgeInsets.symmetric(horizontal: 20.0),
@@ -242,7 +243,7 @@ class DrawerWidget extends StatelessWidget {
                       horizontalTitleGap: 10.0,
                     ),
                     ListTile(
-                      leading: const Icon(LazaIcons.lock),
+                      leading: const Icon(Icons.lock_outline), // Material Icon
                       onTap: () {},
                       contentPadding:
                           const EdgeInsets.symmetric(horizontal: 20.0),
@@ -250,7 +251,8 @@ class DrawerWidget extends StatelessWidget {
                       horizontalTitleGap: 10.0,
                     ),
                     ListTile(
-                      leading: const Icon(LazaIcons.bag),
+                      leading: const Icon(
+                          Icons.shopping_bag_outlined), // Material Icon
                       onTap: () {},
                       contentPadding:
                           const EdgeInsets.symmetric(horizontal: 20.0),
@@ -258,7 +260,8 @@ class DrawerWidget extends StatelessWidget {
                       horizontalTitleGap: 10.0,
                     ),
                     ListTile(
-                      leading: const Icon(LazaIcons.wallet),
+                      leading: const Icon(
+                          Icons.credit_card_outlined), // Material Icon
                       onTap: () {},
                       contentPadding:
                           const EdgeInsets.symmetric(horizontal: 20.0),
@@ -266,7 +269,8 @@ class DrawerWidget extends StatelessWidget {
                       horizontalTitleGap: 10.0,
                     ),
                     ListTile(
-                      leading: const Icon(LazaIcons.heart),
+                      leading:
+                          const Icon(Icons.favorite_border), // Material Icon
                       onTap: () {},
                       contentPadding:
                           const EdgeInsets.symmetric(horizontal: 20.0),
@@ -274,7 +278,8 @@ class DrawerWidget extends StatelessWidget {
                       horizontalTitleGap: 10.0,
                     ),
                     ListTile(
-                      leading: const Icon(LazaIcons.settings),
+                      leading:
+                          const Icon(Icons.settings_outlined), // Material Icon
                       onTap: () {},
                       contentPadding:
                           const EdgeInsets.symmetric(horizontal: 20.0),
@@ -287,7 +292,8 @@ class DrawerWidget extends StatelessWidget {
                 Column(
                   children: [
                     ListTile(
-                      leading: const Icon(LazaIcons.logout, color: Colors.red),
+                      leading: const Icon(Icons.logout,
+                          color: Colors.red), // Material Icon
                       onTap: () async {
                         await showOkCancelAlertDialog(
                           context: context,

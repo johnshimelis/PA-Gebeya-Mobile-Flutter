@@ -68,12 +68,10 @@ class _SignInWithPhoneNumberState extends State<SignInWithPhoneNumber> {
             ),
           );
           // Navigate to OTP Verification Screen
-          Navigator.push(
+          Navigator.pushNamed(
             context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  OtpVerificationScreen(phoneNumber: phoneNumber),
-            ),
+            '/otp_verification',
+            arguments: phoneNumber,
           );
         } else {
           // If message is not as expected

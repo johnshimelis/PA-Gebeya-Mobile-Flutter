@@ -17,6 +17,7 @@ import 'bestseller.dart'; // Import BestsellerScreen
 import 'forYouAds.dart';
 import 'sign_in_with_phone_number.dart'; // Import the sign-in screen
 import 'notifications.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // Helper function to check if the user is logged in
 Future<bool> isUserLoggedIn() async {
@@ -98,12 +99,13 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool isLoggedIn = false;
-  int notificationCount = 3; // Example: Set the notification count
+  int notificationCount = 0; // Initialize with 0
 
   @override
   void initState() {
     super.initState();
     checkLoginStatus();
+    fetchNotificationCount(); // Fetch notification count when the screen loads
   }
 
   Future<void> checkLoginStatus() async {
@@ -111,6 +113,37 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       isLoggedIn = loggedIn;
     });
+  }
+
+  // Fetch notification count
+  Future<void> fetchNotificationCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? token = prefs.getString('token');
+    final String? userId = prefs.getString('userId');
+
+    if (token == null || userId == null) {
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+            'https://pa-gebeya-backend.onrender.com/api/users/notifications/$userId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          notificationCount =
+              data['notifications'].length; // Update notification count
+        });
+      }
+    } catch (error) {
+      debugPrint("Error fetching notifications: $error");
+    }
   }
 
   @override
@@ -125,6 +158,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: HomeAppBar(
           isLoggedIn: isLoggedIn,
           notificationCount: notificationCount, // Pass the notification count
+          onNotificationUpdated: fetchNotificationCount, // Pass the callback
         ),
       ),
       body: SafeArea(
@@ -155,11 +189,10 @@ class _HomeScreenState extends State<HomeScreen> {
                               enabledBorder: inputBorder,
                               focusedBorder: inputBorder,
                               hintStyle:
-                                  TextStyle(color: ColorConstant.manatee),
-                              fillColor: context.theme.cardColor,
-                              prefixIcon:
-                                  Icon(Icons.search, // Material search icon
-                                      color: ColorConstant.manatee)),
+                                  TextStyle(color: Theme.of(context).hintColor),
+                              fillColor: Theme.of(context).cardColor,
+                              prefixIcon: Icon(Icons.search,
+                                  color: Theme.of(context).hintColor)),
                         ),
                       ),
                     ),
@@ -177,12 +210,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           width: 45,
                           height: 45,
                           decoration: BoxDecoration(
-                              color: ColorConstant.primary,
+                              color: Theme.of(context).primaryColor,
                               borderRadius: const BorderRadius.all(
                                   Radius.circular(10.0))),
-                          child: const Icon(Icons.mic, // Material mic icon
-                              color: Colors.white,
-                              size: 22),
+                          child: Icon(Icons.mic, color: Colors.white, size: 22),
                         ),
                       ),
                     ),
@@ -202,9 +233,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Bestseller Section
             BestsellerScreen(),
-            const SizedBox(
-                height:
-                    40.0), // Increased gap between Bestseller and DiscountAds
+            const SizedBox(height: 40.0),
 
             // Discount Ads Section
             DiscountAds(),
@@ -224,13 +253,26 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       // Add a big red phone call floating button
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Add functionality for the phone call button
-          debugPrint('Phone call button pressed');
+        onPressed: () async {
+          // Phone number to call
+          const phoneNumber = '+25176092990';
+          final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+
+          // Check if the device can launch the URL
+          if (await canLaunch(phoneUri.toString())) {
+            await launch(phoneUri.toString()); // Launch the phone dialer
+          } else {
+            debugPrint('Could not launch $phoneUri');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Could not launch phone dialer.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         },
         backgroundColor: Colors.red, // Red color for the button
-        child:
-            const Icon(Icons.call, size: 30, color: Colors.white), // Call icon
+        child: const Icon(Icons.call, size: 30, color: Colors.white),
       ),
       floatingActionButtonLocation:
           FloatingActionButtonLocation.endFloat, // Position at the bottom right
@@ -271,9 +313,14 @@ class _HomeScreenState extends State<HomeScreen> {
 class HomeAppBar extends StatelessWidget {
   final bool isLoggedIn;
   final int notificationCount; // Add a notification count
+  final VoidCallback onNotificationUpdated; // Add this callback
 
-  const HomeAppBar(
-      {super.key, required this.isLoggedIn, this.notificationCount = 0});
+  const HomeAppBar({
+    super.key,
+    required this.isLoggedIn,
+    this.notificationCount = 0,
+    required this.onNotificationUpdated, // Add this parameter
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -292,10 +339,11 @@ class HomeAppBar extends StatelessWidget {
               width: 45,
               height: 45,
               decoration: ShapeDecoration(
-                color: context.theme.cardColor,
+                color: Theme.of(context).cardColor,
                 shape: const CircleBorder(),
               ),
-              child: const Icon(Icons.menu, size: 24), // Material menu icon
+              child: Icon(Icons.menu,
+                  size: 24, color: Theme.of(context).iconTheme.color),
             ),
           ),
           const SizedBox(width: 15), // Increased space between menu and logo
@@ -304,11 +352,12 @@ class HomeAppBar extends StatelessWidget {
             height: 40, // Small size
           ),
           const SizedBox(width: 5), // Space between logo and text
-          const Text(
+          Text(
             'PA Gebeya',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
+              color: Theme.of(context).textTheme.bodyLarge?.color,
             ),
           ),
         ],
@@ -326,8 +375,10 @@ class HomeAppBar extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>
-                          NotificationsScreen(), // Removed const
+                      builder: (context) => NotificationsScreen(
+                        onNotificationUpdated:
+                            onNotificationUpdated, // Pass the callback
+                      ),
                     ),
                   );
                 } else {
@@ -344,13 +395,12 @@ class HomeAppBar extends StatelessWidget {
                 width: 45,
                 height: 45,
                 decoration: ShapeDecoration(
-                  color: context.theme.cardColor,
+                  color: Theme.of(context).cardColor,
                   shape: const CircleBorder(),
                 ),
                 child: Icon(
-                  isLoggedIn
-                      ? Icons.notifications
-                      : Icons.login, // Material icons
+                  isLoggedIn ? Icons.notifications : Icons.login,
+                  color: Theme.of(context).iconTheme.color,
                 ),
               ),
             ),

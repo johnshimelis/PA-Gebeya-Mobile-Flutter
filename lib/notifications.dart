@@ -5,6 +5,10 @@ import 'package:laza/order_detail_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationsScreen extends StatefulWidget {
+  final VoidCallback onNotificationUpdated; // Add this callback
+
+  const NotificationsScreen({super.key, required this.onNotificationUpdated});
+
   @override
   _NotificationsScreenState createState() => _NotificationsScreenState();
 }
@@ -91,6 +95,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           notifications
               .removeWhere((notification) => notification['_id'] == id);
         });
+        widget.onNotificationUpdated(); // Trigger the callback
       } else {
         print("Failed to remove notification: ${response.statusCode}");
       }
@@ -141,17 +146,32 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Notifications'),
-        backgroundColor: Colors.blueAccent,
+        title: Text(
+          'Notifications',
+          style: TextStyle(
+            color: Theme.of(context)
+                .textTheme
+                .headlineSmall
+                ?.color, // Use headlineSmall for title
+          ),
+        ),
         elevation: 0,
+        iconTheme: IconThemeData(
+          color: Theme.of(context).iconTheme.color, // Use theme icon color
+        ),
       ),
       body: isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? Center(
+              child: CircularProgressIndicator(
+                color: Theme.of(context).primaryColor,
+              ),
+            )
           : notifications.isEmpty
               ? Center(
                   child: Text(
                     'No notifications found.',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                    style: TextStyle(
+                        fontSize: 16, color: Theme.of(context).hintColor),
                   ),
                 )
               : ListView.builder(
@@ -162,6 +182,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     return Card(
                       elevation: 2,
                       margin: EdgeInsets.only(bottom: 16),
+                      color: Theme.of(context).cardColor,
                       child: ListTile(
                         contentPadding: EdgeInsets.all(16),
                         title: Text(
@@ -169,14 +190,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
+                            color: Theme.of(context).textTheme.bodyLarge?.color,
                           ),
                         ),
                         subtitle: Text(
                           notification['message'],
-                          style: TextStyle(fontSize: 14),
+                          style: TextStyle(
+                              fontSize: 14,
+                              color: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.color),
                         ),
                         trailing: IconButton(
-                          icon: Icon(Icons.close, color: Colors.red),
+                          icon: Icon(Icons.close,
+                              color: Theme.of(context).colorScheme.error),
                           onPressed: () =>
                               removeNotification(notification['_id']),
                         ),

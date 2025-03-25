@@ -93,7 +93,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       case 'processing':
         return Colors.grey;
       default:
-        return Colors.black;
+        return Theme.of(context).textTheme.bodyMedium!.color!; // Updated here
     }
   }
 
@@ -127,10 +127,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Order Details'),
-        backgroundColor: Colors.blueAccent,
+        backgroundColor: colorScheme.primary,
         elevation: 0,
         actions: [
           IconButton(
@@ -144,7 +147,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.blueAccent.withOpacity(0.1), Colors.white],
+            colors: [
+              colorScheme.primary.withOpacity(0.1),
+              colorScheme.background,
+            ],
           ),
         ),
         child: isLoading
@@ -152,16 +158,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const CircularProgressIndicator(
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Colors.blueAccent),
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        colorScheme.primary,
+                      ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Loading Order Details...',
                       style: TextStyle(
                         fontSize: 16,
-                        color: Colors.blueAccent,
+                        color: colorScheme.primary,
                       ),
                     ),
                   ],
@@ -172,17 +179,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.error_outline,
-                          color: Colors.red,
+                          color: colorScheme.error,
                           size: 48,
                         ),
                         const SizedBox(height: 16),
                         Text(
                           errorMessage,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
-                            color: Colors.red,
+                            color: colorScheme.error,
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -191,14 +198,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           ElevatedButton(
                             onPressed: _refreshOrderDetails,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blueAccent,
+                              backgroundColor: colorScheme.primary,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),
-                            child: const Text(
+                            child: Text(
                               'Retry',
-                              style: TextStyle(color: Colors.white),
+                              style: TextStyle(color: colorScheme.onPrimary),
                             ),
                           ),
                       ],
@@ -221,25 +228,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               children: [
                                 Text(
                                   'Order ID: ${orderData['id'] ?? 'N/A'}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
+                                    color: colorScheme.onSurface,
                                   ),
                                 ),
                                 const SizedBox(height: 16),
                                 Row(
                                   children: [
-                                    const Icon(
+                                    Icon(
                                       Icons.assignment_turned_in,
-                                      color: Colors.blueAccent,
+                                      color: colorScheme.primary,
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
                                       'Status: ',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 16,
-                                        color: Colors
-                                            .black, // Keep the label black
+                                        color: colorScheme.onSurface,
                                       ),
                                     ),
                                     Text(
@@ -252,56 +259,68 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 const SizedBox(height: 16),
                                 Row(
                                   children: [
-                                    const Icon(
+                                    Icon(
                                       Icons.attach_money,
-                                      color: Colors.green,
+                                      color: colorScheme.secondary,
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
                                       'Total: \$${orderData['amount']?.toStringAsFixed(2) ?? 'N/A'}',
-                                      style: const TextStyle(fontSize: 16),
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: colorScheme.onSurface,
+                                      ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 16),
                                 Row(
                                   children: [
-                                    const Icon(
+                                    Icon(
                                       Icons.calendar_today,
-                                      color: Colors.orange,
+                                      color: colorScheme.secondary,
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
                                       'Date: ${orderData['createdAt'] != null ? DateTime.parse(orderData['createdAt']).toLocal().toString() : 'N/A'}',
-                                      style: const TextStyle(fontSize: 16),
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: colorScheme.onSurface,
+                                      ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 16),
                                 Row(
                                   children: [
-                                    const Icon(
+                                    Icon(
                                       Icons.location_on,
-                                      color: Colors.red,
+                                      color: colorScheme.secondary,
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
                                       'Delivery Address: ${orderData['deliveryAddress'] ?? 'N/A'}',
-                                      style: const TextStyle(fontSize: 16),
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: colorScheme.onSurface,
+                                      ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 16),
                                 Row(
                                   children: [
-                                    const Icon(
+                                    Icon(
                                       Icons.phone,
-                                      color: Colors.purple,
+                                      color: colorScheme.secondary,
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
                                       'Phone Number: ${orderData['phoneNumber'] ?? 'N/A'}',
-                                      style: const TextStyle(fontSize: 16),
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: colorScheme.onSurface,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -315,7 +334,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             onTap: () {
                               _showFullScreenImage(
                                 context,
-                                'https://pa-gebeya-backend.onrender.com${orderData['paymentImage']}',
+                                orderData[
+                                    'paymentImage'], // Use the full URL directly
                               );
                             },
                             child: Card(
@@ -328,23 +348,29 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
+                                    Text(
                                       'Payment Image:',
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
+                                        color: colorScheme.onSurface,
                                       ),
                                     ),
                                     const SizedBox(height: 8),
                                     Image.network(
-                                      'https://pa-gebeya-backend.onrender.com${orderData['paymentImage']}',
+                                      orderData[
+                                          'paymentImage'], // Use the full URL directly
                                       width: 200,
                                       height: 200,
                                       fit: BoxFit.cover,
                                       errorBuilder:
                                           (context, error, stackTrace) {
-                                        return const Text(
-                                            'Failed to load image');
+                                        return Text(
+                                          'Failed to load image',
+                                          style: TextStyle(
+                                            color: colorScheme.error,
+                                          ),
+                                        );
                                       },
                                     ),
                                   ],
@@ -363,11 +389,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   'Products:',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
+                                    color: colorScheme.onSurface,
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -384,28 +411,45 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                       return ListTile(
                                         leading: product['productImage'] != null
                                             ? Image.network(
-                                                'https://pa-gebeya-backend.onrender.com${product['productImage']}',
+                                                product[
+                                                    'productImage'], // Use the full URL directly
                                                 width: 50,
                                                 height: 50,
                                                 fit: BoxFit.cover,
                                                 errorBuilder: (context, error,
                                                     stackTrace) {
-                                                  return const Icon(
-                                                      Icons.error);
+                                                  return Icon(
+                                                    Icons.error,
+                                                    color: colorScheme.error,
+                                                  );
                                                 },
                                               )
-                                            : const Icon(
-                                                Icons.image_not_supported),
-                                        title:
-                                            Text(product['product'] ?? 'N/A'),
+                                            : Icon(
+                                                Icons.image_not_supported,
+                                                color: colorScheme.secondary,
+                                              ),
+                                        title: Text(
+                                          product['product'] ?? 'N/A',
+                                          style: TextStyle(
+                                            color: colorScheme.onSurface,
+                                          ),
+                                        ),
                                         subtitle: Text(
                                           'Quantity: ${product['quantity'] ?? 'N/A'}, Price: \$${product['price']?.toStringAsFixed(2) ?? 'N/A'}',
+                                          style: TextStyle(
+                                            color: colorScheme.onSurface,
+                                          ),
                                         ),
                                       );
                                     },
                                   )
                                 else
-                                  const Text('No products found.'),
+                                  Text(
+                                    'No products found.',
+                                    style: TextStyle(
+                                      color: colorScheme.onSurface,
+                                    ),
+                                  ),
                               ],
                             ),
                           ),

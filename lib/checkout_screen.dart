@@ -90,16 +90,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           backgroundColor: Colors.transparent,
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(20),
             ),
             padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                Text(
                   'Delivery Information',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 // Phone Number Field
@@ -107,12 +111,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   controller: phoneNumberController,
                   decoration: InputDecoration(
                     labelText: 'Phone Number',
+                    labelStyle: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    prefixIcon: const Icon(Icons.phone),
+                    prefixIcon: Icon(Icons.phone,
+                        color: Theme.of(context).colorScheme.onSurface),
                   ),
                   keyboardType: TextInputType.phone,
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
                 ),
                 const SizedBox(height: 20),
 
@@ -121,13 +130,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   controller: deliveryLocationController,
                   decoration: InputDecoration(
                     labelText: 'Delivery Location',
+                    labelStyle: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    prefixIcon: const Icon(Icons.location_on),
+                    prefixIcon: Icon(Icons.location_on,
+                        color: Theme.of(context).colorScheme.onSurface),
                   ),
                   keyboardType: TextInputType.text,
                   maxLines: 3, // Increased height
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.onSurface),
                 ),
                 const SizedBox(height: 20),
 
@@ -230,8 +244,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             debugPrint(jsonEncode(checkoutData));
 
                             // Send the order data to the API
-                            // Send the order data to the API
-                            // Send the order data to the API
                             try {
                               // Create a multipart request
                               var request = http.MultipartRequest(
@@ -303,13 +315,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                     responseData['id'].toString();
 
                                 // Show a success message
-                                scaffoldMessengerKey.currentState?.showSnackBar(
-                                  const SnackBar(
-                                    content:
-                                        Text('Order submitted successfully!'),
-                                    backgroundColor: Colors.green,
-                                  ),
-                                );
 
                                 // Wait for 2 seconds before clearing the cart
                                 await Future.delayed(
@@ -441,28 +446,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
                               // Go back to the checkout screen
                               navigatorKey.currentState?.pop();
-                            } catch (e) {
-                              // Show an error message
-                              scaffoldMessengerKey.currentState?.showSnackBar(
-                                SnackBar(
-                                  content: Text('Error: $e'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-
-                              // Go back to the checkout screen
-                              navigatorKey.currentState?.pop();
-                            } catch (e) {
-                              // Show an error message
-                              scaffoldMessengerKey.currentState?.showSnackBar(
-                                SnackBar(
-                                  content: Text('Error: $e'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-
-                              // Go back to the checkout screen
-                              navigatorKey.currentState?.pop();
                             }
                           } else {
                             // Handle the case where checkout data is not found
@@ -518,16 +501,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Center(
                 child: Text(
                   'Total: \$${totalAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ),
@@ -535,12 +518,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const SizedBox(height: 20),
 
             // Bank Account Details
-            const Text(
+            Text(
               'Bank Account Details',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Colors.blue,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
             const SizedBox(height: 10),
@@ -558,23 +541,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Bank of Ethiopia',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.blue,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'Account Number: 1000522957273',
-                        style: TextStyle(fontSize: 14),
+                        style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).colorScheme.onSurface),
                       ),
                       const SizedBox(height: 5),
-                      const Text(
+                      Text(
                         'Account Name: John Doe',
-                        style: TextStyle(fontSize: 14),
+                        style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).colorScheme.onSurface),
                       ),
                     ],
                   ),
@@ -596,23 +583,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Chase Bank',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.blue,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'Account Number: 9876543210987654',
-                        style: TextStyle(fontSize: 14),
+                        style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).colorScheme.onSurface),
                       ),
                       const SizedBox(height: 5),
-                      const Text(
+                      Text(
                         'Account Name: Jane Smith',
-                        style: TextStyle(fontSize: 14),
+                        style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).colorScheme.onSurface),
                       ),
                     ],
                   ),
@@ -634,23 +625,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Wells Fargo',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.blue,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'Account Number: 4567890123456789',
-                        style: TextStyle(fontSize: 14),
+                        style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).colorScheme.onSurface),
                       ),
                       const SizedBox(height: 5),
-                      const Text(
+                      Text(
                         'Account Name: Robert Johnson',
-                        style: TextStyle(fontSize: 14),
+                        style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).colorScheme.onSurface),
                       ),
                     ],
                   ),
@@ -663,24 +658,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Center(
               child: Column(
                 children: [
-                  const Text(
+                  Text(
                     'Upload Payment Screenshot',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                   const SizedBox(height: 10),
                   OutlinedButton.icon(
                     onPressed: pickFile, // Use the pickFile function
-                    icon: const Icon(Icons.upload, color: Colors.blue),
-                    label: const Text(
+                    icon: Icon(Icons.upload,
+                        color: Theme.of(context).colorScheme.primary),
+                    label: Text(
                       'Choose File',
-                      style: TextStyle(color: Colors.blue),
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary),
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.blue),
+                      side: BorderSide(
+                          color: Theme.of(context).colorScheme.primary),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -694,9 +692,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     const SizedBox(height: 10),
                     Text(
                       'Selected File: $selectedFile',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: Colors.green,
+                        color: Theme.of(context).colorScheme.secondary,
                       ),
                     ),
                   ],
@@ -710,16 +708,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: ElevatedButton(
                 onPressed: () => _showCompleteOrderModal(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                   padding:
                       const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
                 ),
-                child: const Text(
+                child: Text(
                   'Complete Order',
-                  style: TextStyle(fontSize: 18, color: Colors.white),
+                  style: TextStyle(
+                      fontSize: 18,
+                      color: Theme.of(context).colorScheme.onPrimary),
                 ),
               ),
             ),

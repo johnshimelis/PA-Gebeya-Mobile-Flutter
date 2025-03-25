@@ -147,7 +147,9 @@ class _DashboardState extends State<Dashboard> {
                 onCartUpdated:
                     fetchCartItemCount, // Pass callback to CartScreen
               ),
-              const OrdersScreen(),
+              OrdersScreen(
+                onOrderUpdated: fetchOrderCount, // Pass the callback
+              ),
             ],
           ),
           bottomNavigationBar: SizedBox(

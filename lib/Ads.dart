@@ -19,8 +19,6 @@ class _AdsState extends State<Ads> {
   bool isLoading = true;
   bool hasError = false;
 
-  final String baseUrl = "https://pa-gebeya-backend.onrender.com/";
-
   @override
   void initState() {
     super.initState();
@@ -46,10 +44,11 @@ class _AdsState extends State<Ads> {
         if (data.isNotEmpty) {
           if (mounted) {
             setState(() {
+              // Extract image URLs directly from the "images" field
               adImages = data
-                  .expand((ad) => (ad["images"] as List).map(
-                      (img) => img.toString().isNotEmpty ? "$baseUrl$img" : ""))
-                  .where((url) => url.isNotEmpty) // Remove empty URLs
+                  .expand((ad) => (ad["images"] as List)
+                      .map((img) => img.toString())
+                      .where((url) => url.isNotEmpty)) // Remove empty URLs
                   .toList();
               isLoading = false;
               hasError = false;
@@ -120,7 +119,7 @@ class _AdsState extends State<Ads> {
         itemCount: adImages.length,
         itemBuilder: (context, index) {
           return Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20.0),
               child: CachedNetworkImage(

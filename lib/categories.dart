@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
 import 'package:laza/brand_products_screen.dart';
 import 'package:laza/components/colors.dart';
 import 'package:laza/extensions/context_extension.dart';
@@ -9,25 +8,25 @@ import 'package:laza/models/brand.dart';
 import 'package:laza/components/laza_icons.dart';
 
 class Categories extends StatelessWidget {
-  const Categories(
-      {super.key, required this.onCartUpdated}); // Add onCartUpdated
-  final VoidCallback onCartUpdated; // Non-nullable VoidCallback
+  const Categories({super.key, required this.onCartUpdated});
+  final VoidCallback onCartUpdated;
 
   Future<List<AppCategory>> fetchCategories() async {
-    final response = await http.get(
-        Uri.parse("https://pa-gebeya-backend.onrender.com/api/categories"));
+    try {
+      final response = await http.get(
+        Uri.parse("https://pa-gebeya-backend.onrender.com/api/categories"),
+        headers: {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 15));
 
-    if (response.statusCode == 200) {
-      List<dynamic> data = json.decode(response.body);
-
-      // Debugging: Print all categories fetched
-      for (var category in data) {
-        print("Fetched Category: ${jsonEncode(category)}");
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        debugPrint("Fetched ${data.length} categories");
+        return data.map((json) => AppCategory.fromJson(json)).toList();
+      } else {
+        throw Exception("Failed to load categories: ${response.statusCode}");
       }
-
-      return data.map((json) => AppCategory.fromJson(json)).toList();
-    } else {
-      throw Exception("Failed to load categories");
+    } catch (e) {
+      throw Exception("Network error: ${e.toString()}");
     }
   }
 
@@ -36,55 +35,88 @@ class Categories extends StatelessWidget {
     return Column(
       children: [
         const SizedBox(height: 10.0),
-        Headline(
+        const Headline(
           headline: 'Categories',
-          onViewAllTap: () {},
+          onViewAllTap: null,
         ),
         FutureBuilder<List<AppCategory>>(
           future: fetchCategories(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(child: Text("Error: ${snapshot.error}"));
-            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            }
+
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  children: [
+                    const Icon(Icons.error, color: Colors.red),
+                    Text("Error: ${snapshot.error.toString()}"),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              Categories(onCartUpdated: onCartUpdated),
+                        ),
+                      ),
+                      child: const Text("Retry"),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            final categories = snapshot.data ?? [];
+            if (categories.isEmpty) {
               return const Center(child: Text("No categories available"));
             }
 
-            final categories = snapshot.data!;
-            final int mid = (categories.length / 2).ceil();
+            // Split categories into two rows
+            final midPoint = (categories.length / 2).ceil();
+            final firstRow = categories.sublist(0, midPoint);
+            final secondRow = categories.sublist(midPoint);
 
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4.0),
               child: Column(
                 children: [
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: List.generate(
-                        mid,
-                        (index) => Padding(
-                          padding: const EdgeInsets.only(right: 4.0),
-                          child: CategoryTile(
-                            category: categories[index],
-                            onCartUpdated: onCartUpdated, // Pass the callback
+                  // First row
+                  SizedBox(
+                    height: 120, // Fixed height for consistent layout
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: List.generate(
+                          firstRow.length,
+                          (index) => Padding(
+                            padding: const EdgeInsets.only(right: 4.0),
+                            child: CategoryTile(
+                              category: firstRow[index],
+                              onCartUpdated: onCartUpdated,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: List.generate(
-                        categories.length - mid,
-                        (index) => Padding(
-                          padding: const EdgeInsets.only(right: 4.0),
-                          child: CategoryTile(
-                            category: categories[index + mid],
-                            onCartUpdated: onCartUpdated, // Pass the callback
+                  const SizedBox(height: 8),
+                  // Second row
+                  SizedBox(
+                    height: 120, // Fixed height for consistent layout
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: List.generate(
+                          secondRow.length,
+                          (index) => Padding(
+                            padding: const EdgeInsets.only(right: 4.0),
+                            child: CategoryTile(
+                              category: secondRow[index],
+                              onCartUpdated: onCartUpdated,
+                            ),
                           ),
                         ),
                       ),
@@ -115,8 +147,8 @@ class Headline extends StatelessWidget {
           Text(
             headline,
             style: context.bodyLargeW500?.copyWith(
-              fontSize: 24, // Increased size
-              fontWeight: FontWeight.bold, // Made bold
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
             ),
           ),
           TextButton(
@@ -136,23 +168,27 @@ class CategoryTile extends StatelessWidget {
   const CategoryTile({
     super.key,
     required this.category,
-    required this.onCartUpdated, // Add onCartUpdated
+    required this.onCartUpdated,
   });
   final AppCategory category;
-  final VoidCallback onCartUpdated; // Non-nullable VoidCallback
+  final VoidCallback onCartUpdated;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        final brand =
-            Brand(category.name, LazaIcons.adidas_logo); // Use a default icon
+        final brand = Brand(
+          category.name,
+          LazaIcons.adidas_logo,
+          categoryId: category.id,
+        );
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => BrandProductsScreen(
               brand: brand,
-              onCartUpdated: onCartUpdated, // Pass the callback
+              categoryId: category.id,
+              onCartUpdated: onCartUpdated,
             ),
           ),
         );
@@ -179,10 +215,17 @@ class CategoryTile extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6.0),
-            Text(
-              category.name,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-              textAlign: TextAlign.center,
+            Flexible(
+              child: Text(
+                category.name,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
@@ -192,15 +235,17 @@ class CategoryTile extends StatelessWidget {
 }
 
 class AppCategory {
+  final String id;
   final String name;
   final String? image;
 
-  AppCategory({required this.name, this.image});
+  AppCategory({required this.id, required this.name, this.image});
 
   factory AppCategory.fromJson(Map<String, dynamic> json) {
     return AppCategory(
-      name: json['name'],
-      image: json['image'], // Use the image URL directly from the API response
+      id: json['_id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Unnamed Category',
+      image: json['image']?.toString(),
     );
   }
 }

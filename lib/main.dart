@@ -6,6 +6,9 @@ import 'package:laza/order_confirmed_screen.dart'; // Import the OrderConfirmedS
 import 'package:laza/sign_in_with_phone_number.dart'; // Import the SignInWithPhoneNumber screen
 import 'package:laza/notifications.dart'; // Import the NotificationsScreen
 import 'package:laza/order_detail_screen.dart'; // Import the OrderDetailScreen
+import 'package:laza/home_screen.dart'; // Import the HomeScreen
+import 'package:laza/dashboard.dart'; // Import the Dashboard screen
+import 'package:laza/otp_verification_screen.dart'; // Import the OtpVerificationScreen
 
 // Define global keys
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -26,7 +29,7 @@ class MyApp extends StatelessWidget {
       child: Consumer<ThemeNotifier>(
         builder: (context, themeNotifier, child) {
           return MaterialApp(
-            title: 'Laza',
+            title: 'PA Gebeya',
             debugShowCheckedModeBanner: false,
             themeMode: themeNotifier.themeMode,
             theme: AppTheme.lightTheme,
@@ -38,17 +41,23 @@ class MyApp extends StatelessWidget {
             scaffoldMessengerKey: scaffoldMessengerKey,
             // Define your routes here
             routes: {
+              '/home': (context) => const HomeScreen(),
               '/order_confirmed_screen': (context) =>
                   const OrderConfirmedScreen(),
-              '/sign-in-with-phone': (context) =>
-                  const SignInWithPhoneNumber(), // Define the SignInWithPhoneNumber route
+              '/sign_in_with_phone_number': (context) =>
+                  const SignInWithPhoneNumber(),
               '/notifications': (context) =>
-                  NotificationsScreen(), // Define the NotificationsScreen route
+                  NotificationsScreen(onNotificationUpdated: () {}),
               '/order_detail': (context) {
                 final orderId =
                     ModalRoute.of(context)!.settings.arguments as String;
-                return OrderDetailScreen(
-                    orderId: orderId); // Define the OrderDetailScreen route
+                return OrderDetailScreen(orderId: orderId);
+              },
+              '/dashboard': (context) => const Dashboard(),
+              '/otp_verification': (context) {
+                final phoneNumber =
+                    ModalRoute.of(context)!.settings.arguments as String;
+                return OtpVerificationScreen(phoneNumber: phoneNumber);
               },
             },
           );

@@ -5,7 +5,7 @@ import 'package:laza/order_detail_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationsScreen extends StatefulWidget {
-  final VoidCallback onNotificationUpdated; // Add this callback
+  final VoidCallback onNotificationUpdated;
 
   const NotificationsScreen({super.key, required this.onNotificationUpdated});
 
@@ -48,7 +48,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             .where((notification) => notification['orderId'] != null)
             .toList();
 
-        // Convert HTML messages to plain text
         for (var notification in validNotifications) {
           notification['message'] =
               _convertHtmlToPlainText(notification['message']);
@@ -66,9 +65,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  // Convert HTML to plain text
   String _convertHtmlToPlainText(String html) {
-    // Remove HTML tags using regex
     return html.replaceAll(RegExp(r'<[^>]*>'), '');
   }
 
@@ -95,7 +92,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           notifications
               .removeWhere((notification) => notification['_id'] == id);
         });
-        widget.onNotificationUpdated(); // Trigger the callback
+        widget.onNotificationUpdated();
       } else {
         print("Failed to remove notification: ${response.statusCode}");
       }
@@ -126,12 +123,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         final orderData = jsonDecode(response.body);
         print("Order details retrieved successfully: $orderData");
 
-        // Navigate to the order detail screen with orderId
+        // Get the order creation time from the order data
+        final createdAt = orderData['createdAt'] != null
+            ? DateTime.parse(orderData['createdAt'])
+            : DateTime.now();
+
+        // Navigate to the order detail screen with both orderId and creation time
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) =>
-                OrderDetailScreen(orderId: notification['orderId']),
+            builder: (context) => OrderDetailScreen(
+              orderId: notification['orderId'],
+              orderCreationTime: createdAt,
+            ),
           ),
         );
       } else {
@@ -149,15 +153,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         title: Text(
           'Notifications',
           style: TextStyle(
-            color: Theme.of(context)
-                .textTheme
-                .headlineSmall
-                ?.color, // Use headlineSmall for title
+            color: Theme.of(context).textTheme.headlineSmall?.color,
           ),
         ),
         elevation: 0,
         iconTheme: IconThemeData(
-          color: Theme.of(context).iconTheme.color, // Use theme icon color
+          color: Theme.of(context).iconTheme.color,
         ),
       ),
       body: isLoading

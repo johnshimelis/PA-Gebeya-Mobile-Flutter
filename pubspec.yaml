@@ -8,6 +8,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  shimmer: ^2.0.0
+  
   url_launcher: ^6.1.11 # Add this line
   badges: ^2.0.3
   intl: ^0.18.0 

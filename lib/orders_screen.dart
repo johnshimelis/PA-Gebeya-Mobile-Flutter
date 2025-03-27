@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'order_detail_screen.dart'; // Import the OrderDetailScreen
+import 'order_detail_screen.dart';
+import 'package:intl/intl.dart';
 
 class OrdersScreen extends StatefulWidget {
-  final VoidCallback onOrderUpdated; // Add this callback
+  final VoidCallback onOrderUpdated;
 
   const OrdersScreen({super.key, required this.onOrderUpdated});
 
@@ -62,6 +63,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
             fetchedOrders.add({
               ...order,
               'status': orderDetails['status'],
+              'createdAt':
+                  orderDetails['createdAt'], // Add createdAt from details
             });
           } else {
             fetchedOrders.add(order);
@@ -107,8 +110,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           orders =
               orders.where((order) => order['orderId'] != orderId).toList();
         });
-        widget
-            .onOrderUpdated(); // Trigger the callback to update the order count
+        widget.onOrderUpdated();
       }
     } catch (error) {
       print('Error deleting order: $error');
@@ -119,9 +121,16 @@ class _OrdersScreenState extends State<OrdersScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => OrderDetailScreen(orderId: order['orderId']),
+        builder: (context) => OrderDetailScreen(
+          orderId: order['orderId'],
+          orderCreationTime:
+              DateTime.parse(order['createdAt']), // Pass creation time
+        ),
       ),
-    );
+    ).then((_) {
+      // Refresh orders when returning from detail screen
+      fetchOrders();
+    });
   }
 
   TextStyle getStatusStyle(String status) {
@@ -149,16 +158,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
         title: Text(
           'Orders',
           style: TextStyle(
-            color: Theme.of(context)
-                .textTheme
-                .headlineSmall
-                ?.color, // Use headlineSmall for title
+            color: Theme.of(context).textTheme.headlineSmall?.color,
           ),
         ),
         centerTitle: true,
         elevation: 0,
         iconTheme: IconThemeData(
-          color: Theme.of(context).iconTheme.color, // Use theme icon color
+          color: Theme.of(context).iconTheme.color,
         ),
       ),
       body: isLoading
@@ -175,60 +181,81 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         fontSize: 16, color: Theme.of(context).hintColor),
                   ),
                 )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16.0),
-                  itemCount: orders.length,
-                  itemBuilder: (context, index) {
-                    final order = orders[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 16.0),
-                      color: Theme.of(context).cardColor,
-                      child: ListTile(
-                        leading: Icon(Icons.shopping_bag,
-                            color: Theme.of(context).primaryColor),
-                        title: Text(
-                          'Order #${order['orderId']}',
-                          style: TextStyle(
-                              color:
-                                  Theme.of(context).textTheme.bodyLarge?.color),
-                        ),
-                        subtitle: RichText(
-                          text: TextSpan(
-                            style: DefaultTextStyle.of(context).style,
-                            children: <TextSpan>[
-                              TextSpan(
-                                text: 'Status: ',
-                                style: TextStyle(
-                                    color: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.color),
+              : RefreshIndicator(
+                  onRefresh: fetchOrders,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16.0),
+                    itemCount: orders.length,
+                    itemBuilder: (context, index) {
+                      final order = orders[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 16.0),
+                        color: Theme.of(context).cardColor,
+                        child: ListTile(
+                          leading: Icon(Icons.shopping_bag,
+                              color: Theme.of(context).primaryColor),
+                          title: Text(
+                            'Order #${order['orderId']}',
+                            style: TextStyle(
+                                color: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.color),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              RichText(
+                                text: TextSpan(
+                                  style: DefaultTextStyle.of(context).style,
+                                  children: <TextSpan>[
+                                    TextSpan(
+                                      text: 'Status: ',
+                                      style: TextStyle(
+                                          color: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.color),
+                                    ),
+                                    TextSpan(
+                                      text: order['status'],
+                                      style: getStatusStyle(order['status']),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              TextSpan(
-                                text: order['status'],
-                                style: getStatusStyle(order['status']),
+                              if (order['createdAt'] != null)
+                                Text(
+                                  'Placed: ${DateFormat('MMM dd, yyyy - hh:mm a').format(DateTime.parse(order['createdAt']).toLocal())}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context).hintColor,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.visibility,
+                                    color: Theme.of(context).iconTheme.color),
+                                onPressed: () => handleViewDetails(order),
                               ),
+                              if (order['status']?.toLowerCase() == 'pending')
+                                IconButton(
+                                  icon: Icon(Icons.delete,
+                                      color:
+                                          Theme.of(context).colorScheme.error),
+                                  onPressed: () =>
+                                      handleDelete(order['orderId']),
+                                ),
                             ],
                           ),
                         ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: Icon(Icons.visibility,
-                                  color: Theme.of(context).iconTheme.color),
-                              onPressed: () => handleViewDetails(order),
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.delete,
-                                  color: Theme.of(context).colorScheme.error),
-                              onPressed: () => handleDelete(order['orderId']),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
     );
   }

@@ -77,7 +77,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
   }
 
   Future<void> fetchRelatedProducts() async {
-    // Check if category is an object with _id or just a string ID
     String? categoryId;
     if (widget.product.category is Map<String, dynamic>) {
       categoryId = (widget.product.category as Map<String, dynamic>)['_id'];
@@ -142,6 +141,23 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
   Future<void> addToCart(Product product) async {
     debugPrint("🟢 addToCart called for product: ${product.id}");
+
+    // Check stock quantity before proceeding
+    if (product.stockQuantity != null && product.stockQuantity! <= 0) {
+      debugPrint("🚨 Error: Product is out of stock!");
+      showToast("This product is currently out of stock", error: true);
+      return;
+    }
+
+    // Check if requested quantity exceeds available stock
+    if (product.stockQuantity != null && quantity > product.stockQuantity!) {
+      debugPrint("🚨 Error: Requested quantity exceeds available stock!");
+      showToast(
+        "Only ${product.stockQuantity} items available in stock",
+        error: true,
+      );
+      return;
+    }
 
     if (product.id == null || product.id!.isEmpty) {
       debugPrint("🚨 Error: Product ID is null or empty!");
@@ -242,7 +258,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     final bottomPadding =
         context.bottomViewPadding == 0.0 ? 30.0 : context.bottomViewPadding;
 
-    // Check if category is an object with _id or just a string
     final categoryId = product.category is Map<String, dynamic>
         ? (product.category as Map<String, dynamic>)['_id']
         : product.categoryId;
@@ -265,6 +280,17 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Total Price', style: context.bodyMediumW600),
+                    if (product.stockQuantity != null)
+                      Text(
+                        product.stockQuantity! > 0
+                            ? '${product.stockQuantity} items available'
+                            : 'Out of stock',
+                        style: context.bodySmall?.copyWith(
+                          color: product.stockQuantity! > 0
+                              ? Colors.green
+                              : Colors.red,
+                        ),
+                      ),
                   ],
                 ),
                 Text(
@@ -273,9 +299,34 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
               ],
             ),
           ),
-          BottomNavButton(
-            label: 'Add to Cart',
-            onTap: () => addToCart(widget.product),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    product.stockQuantity != null && product.stockQuantity! <= 0
+                        ? Colors.grey
+                        : Theme.of(context).primaryColor,
+                minimumSize: const Size(double.infinity, 56),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+              ),
+              onPressed:
+                  product.stockQuantity != null && product.stockQuantity! <= 0
+                      ? null
+                      : () => addToCart(widget.product),
+              child: Text(
+                product.stockQuantity != null && product.stockQuantity! <= 0
+                    ? 'Out of Stock'
+                    : 'Add to Cart',
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -485,11 +536,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                         ),
                         IconButton(
                           icon: const Icon(Icons.add, color: Colors.green),
-                          onPressed: () {
-                            setState(() {
-                              quantity++;
-                            });
-                          },
+                          onPressed: product.stockQuantity != null &&
+                                  quantity >= product.stockQuantity!
+                              ? null
+                              : () {
+                                  setState(() {
+                                    quantity++;
+                                  });
+                                },
                         ),
                       ],
                     ),
@@ -723,8 +777,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                                                     ],
                                                   ),
                                                   child: const Icon(
-                                                    Icons
-                                                        .tiktok, // Changed from Icons.music_note to Icons.tiktok
+                                                    Icons.tiktok,
                                                     color: Colors.black,
                                                     size: 20,
                                                   ),

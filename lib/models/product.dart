@@ -17,6 +17,8 @@ class Product {
   final int? sold;
   final String? videoLink;
   final String? categoryId;
+  final int? stockQuantity;
+  final int? quantity; // Quantity selected by user for ordering
 
   const Product({
     required this.title,
@@ -34,6 +36,8 @@ class Product {
     this.sold,
     this.videoLink,
     this.categoryId,
+    this.stockQuantity,
+    this.quantity,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -111,6 +115,8 @@ class Product {
       sold: json['sold'] as int? ?? 0,
       videoLink: json['videoLink']?.toString(),
       categoryId: parseCategoryId(json['category']),
+      stockQuantity: json['stockQuantity'] as int?,
+      quantity: json['quantity'] as int? ?? 1, // Default quantity is 1
     );
   }
 
@@ -130,6 +136,8 @@ class Product {
         'sold': sold,
         'videoLink': videoLink,
         'categoryId': categoryId,
+        'stockQuantity': stockQuantity,
+        'quantity': quantity,
       };
 
   // Helper method to get category name regardless of type
@@ -146,16 +154,70 @@ class Product {
     return null;
   }
 
+  // Helper method to check if product is in stock
+  bool get isInStock => (stockQuantity ?? 0) > 0;
+
+  // Helper method to check if requested quantity is available
+  bool isQuantityAvailable([int? requestedQuantity]) {
+    final qty = requestedQuantity ?? quantity ?? 1;
+    return isInStock && qty <= (stockQuantity ?? 0);
+  }
+
+  // Creates a copy of the product with updated values
+  Product copyWith({
+    String? title,
+    String? thumbnailPath,
+    String? price,
+    dynamic category,
+    String? shortDescription,
+    String? fullDescription,
+    List<String>? images,
+    String? oldPrice,
+    String? discount,
+    String? id,
+    String? brand,
+    double? rating,
+    int? sold,
+    String? videoLink,
+    String? categoryId,
+    int? stockQuantity,
+    int? quantity,
+  }) {
+    return Product(
+      title: title ?? this.title,
+      thumbnailPath: thumbnailPath ?? this.thumbnailPath,
+      price: price ?? this.price,
+      category: category ?? this.category,
+      shortDescription: shortDescription ?? this.shortDescription,
+      fullDescription: fullDescription ?? this.fullDescription,
+      images: images ?? this.images,
+      oldPrice: oldPrice ?? this.oldPrice,
+      discount: discount ?? this.discount,
+      id: id ?? this.id,
+      brand: brand ?? this.brand,
+      rating: rating ?? this.rating,
+      sold: sold ?? this.sold,
+      videoLink: videoLink ?? this.videoLink,
+      categoryId: categoryId ?? this.categoryId,
+      stockQuantity: stockQuantity ?? this.stockQuantity,
+      quantity: quantity ?? this.quantity,
+    );
+  }
+
   @override
   String toString() {
-    return 'Product{title: $title, id: $id, category: $category, categoryId: $categoryId}';
+    return 'Product{title: $title, id: $id, price: $price, stockQuantity: $stockQuantity, quantity: $quantity}';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Product && runtimeType == other.runtimeType && id == other.id;
+      other is Product &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          stockQuantity == other.stockQuantity &&
+          quantity == other.quantity;
 
   @override
-  int get hashCode => id?.hashCode ?? 0;
+  int get hashCode => id.hashCode ^ stockQuantity.hashCode ^ quantity.hashCode;
 }

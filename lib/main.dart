@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:laza/splash_screen.dart';
 import 'package:laza/theme.dart';
 import 'package:provider/provider.dart';
-import 'package:laza/order_confirmed_screen.dart'; // Import the OrderConfirmedScreen
-import 'package:laza/sign_in_with_phone_number.dart'; // Import the SignInWithPhoneNumber screen
-import 'package:laza/notifications.dart'; // Import the NotificationsScreen
-import 'package:laza/order_detail_screen.dart'; // Import the OrderDetailScreen
-import 'package:laza/home_screen.dart'; // Import the HomeScreen
-import 'package:laza/dashboard.dart'; // Import the Dashboard screen
-import 'package:laza/otp_verification_screen.dart'; // Import the OtpVerificationScreen
+import 'package:laza/order_confirmed_screen.dart';
+import 'package:laza/sign_in_with_phone_number.dart';
+import 'package:laza/notifications.dart';
+import 'package:laza/order_detail_screen.dart';
+import 'package:laza/home_screen.dart';
+import 'package:laza/dashboard.dart';
+import 'package:laza/otp_verification_screen.dart';
 
 // Define global keys
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -35,11 +35,8 @@ class MyApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             home: const SplashScreen(),
-            // Use the global NavigatorKey
             navigatorKey: navigatorKey,
-            // Use the global ScaffoldMessengerKey
             scaffoldMessengerKey: scaffoldMessengerKey,
-            // Define your routes here
             routes: {
               '/home': (context) => const HomeScreen(),
               '/order_confirmed_screen': (context) =>
@@ -49,9 +46,11 @@ class MyApp extends StatelessWidget {
               '/notifications': (context) =>
                   NotificationsScreen(onNotificationUpdated: () {}),
               '/order_detail': (context) {
-                final orderId =
-                    ModalRoute.of(context)!.settings.arguments as String;
-                return OrderDetailScreen(orderId: orderId);
+                final args = ModalRoute.of(context)!.settings.arguments as Map;
+                return OrderDetailScreen(
+                  orderId: args['orderId'],
+                  orderCreationTime: args['createdAt'] ?? DateTime.now(),
+                );
               },
               '/dashboard': (context) => const Dashboard(),
               '/otp_verification': (context) {

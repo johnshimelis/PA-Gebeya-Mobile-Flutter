@@ -3,7 +3,6 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http_parser/http_parser.dart';
 import 'package:laza/models/index.dart';
 import 'package:laza/extensions/context_extension.dart';
 import 'package:laza/product_details.dart';
@@ -18,17 +17,20 @@ class ForYouScreen extends StatefulWidget {
 }
 
 class _ForYouScreenState extends State<ForYouScreen>
-    with SingleTickerProviderStateMixin {
-  late Future<List<ProductDetail>> futureProducts;
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  Future<List<ProductDetail>> futureProducts = Future.value([]);
   List<ProductDetail> allProducts = [];
   List<ProductDetail> displayedProducts = [];
   int itemsToShow = 50;
-  Map<String, int> cartItems = {};
   bool isLoggedIn = false;
   String? userId;
+  String? authToken;
   late AnimationController _animationController;
-  final Map<String, PageController> _pageControllers = {};
   final Map<String, Timer> _timers = {};
+  final String _productsCacheKey = 'cached_foryou_products';
 
   String _getFullImageUrl(String imagePath) {
     if (imagePath.startsWith('http')) {
@@ -40,58 +42,153 @@ class _ForYouScreenState extends State<ForYouScreen>
   @override
   void initState() {
     super.initState();
-    futureProducts = fetchProducts();
-    checkLoginStatus();
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    await checkLoginStatus();
+    futureProducts = _fetchProductsWithCacheFallback();
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     _animationController.dispose();
-    for (var controller in _pageControllers.values) {
-      controller.dispose();
-    }
     for (var timer in _timers.values) {
       timer.cancel();
     }
     super.dispose();
   }
 
-  void _startAutoScroll(String productId, int imageCount) {
-    _timers[productId] = Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (_pageControllers[productId]!.hasClients) {
-        if (_pageControllers[productId]!.page ==
-            (_pageControllers[productId]!.position.maxScrollExtent / 200)
-                .floor()) {
-          _pageControllers[productId]!.animateToPage(
-            0,
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut,
-          );
-        } else {
-          _pageControllers[productId]!.nextPage(
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut,
-          );
-        }
+  Future<List<ProductDetail>> _fetchProductsWithCacheFallback() async {
+    try {
+      final freshProducts = await _fetchProductsFromNetwork();
+      await _cacheProducts(freshProducts);
+      return freshProducts;
+    } catch (e) {
+      debugPrint("❌ Network error: $e");
+      final cachedProducts = await _getCachedProducts();
+      if (cachedProducts != null && cachedProducts.isNotEmpty) {
+        debugPrint("⚠️ Using cached products as fallback");
+        return cachedProducts;
       }
+      return [];
+    }
+  }
+
+  Future<List<ProductDetail>> _fetchProductsFromNetwork() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://pa-gebeya-backend.onrender.com/api/products/'),
+        headers: {
+          if (authToken != null) 'Authorization': 'Bearer $authToken',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        debugPrint("🟢 Fetched ${data.length} products from network");
+        return data.map((item) => ProductDetail.fromJson(item)).toList();
+      } else {
+        throw Exception('Failed to load products: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('❌ Network fetch error: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<ProductDetail>?> _getCachedProducts() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedData = prefs.getString(_productsCacheKey);
+      if (cachedData == null) return null;
+
+      final List<dynamic> jsonList = jsonDecode(cachedData);
+      return jsonList.map((json) => ProductDetail.fromJson(json)).toList();
+    } catch (e) {
+      debugPrint("❌ Error reading cached products: $e");
+      return null;
+    }
+  }
+
+  Future<void> _cacheProducts(List<ProductDetail> products) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final productJsonList =
+          products.map((p) => _productDetailToJson(p)).toList();
+      await prefs.setString(_productsCacheKey, jsonEncode(productJsonList));
+      debugPrint("✅ Cached ${products.length} products");
+    } catch (e) {
+      debugPrint("❌ Error caching products: $e");
+    }
+  }
+
+  Map<String, dynamic> _productDetailToJson(ProductDetail product) {
+    return {
+      'id': product.id,
+      'name': product.name,
+      'price': product.price,
+      'photo': product.photo,
+      'shortDescription': product.shortDescription,
+      'fullDescription': product.fullDescription,
+      'rating': product.rating,
+      'sold': product.sold,
+      'videoLink': product.videoLink,
+      'images': product.images,
+      'category': product.category,
+      'brand': product.brand,
+      'discount': product.discount,
+      'oldPrice': product.oldPrice,
+    };
+  }
+
+  Future<void> _refreshProducts() async {
+    setState(() {
+      futureProducts = _fetchProductsWithCacheFallback().then((products) {
+        if (products.isNotEmpty) {
+          allProducts = products;
+          displayedProducts = allProducts.take(itemsToShow).toList();
+        }
+        return products;
+      });
     });
+  }
+
+  Future<void> checkLoginStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      authToken = prefs.getString('token');
+      userId = prefs.getString('userId');
+
+      if (authToken != null &&
+          authToken!.isNotEmpty &&
+          !isTokenExpired(authToken)) {
+        setState(() => isLoggedIn = true);
+        debugPrint("✅ User is logged in: userId=$userId");
+      } else {
+        setState(() {
+          isLoggedIn = false;
+          userId = null;
+        });
+        debugPrint("🚨 User is not logged in or token expired.");
+      }
+    } catch (e) {
+      debugPrint("❌ Error checking login status: $e");
+    }
   }
 
   bool isTokenExpired(String? token) {
     if (token == null) return true;
     try {
       final parts = token.split(".");
-      if (parts.length != 3) {
-        throw Exception("Invalid JWT structure");
-      }
+      if (parts.length != 3) throw Exception("Invalid JWT structure");
       String payload = parts[1];
-      while (payload.length % 4 != 0) {
-        payload += '=';
-      }
+      while (payload.length % 4 != 0) payload += '=';
       final decodedPayload = utf8.decode(base64Url.decode(payload));
       final payloadMap = json.decode(decodedPayload);
       final exp = payloadMap["exp"] as int;
@@ -103,140 +200,22 @@ class _ForYouScreenState extends State<ForYouScreen>
     }
   }
 
-  Future<void> checkLoginStatus() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? storedToken = prefs.getString('token');
-    userId = prefs.getString('userId');
-
-    if (storedToken != null &&
-        storedToken.isNotEmpty &&
-        !isTokenExpired(storedToken)) {
-      setState(() => isLoggedIn = true);
-      debugPrint("✅ User is logged in: userId=$userId");
-    } else {
-      setState(() {
-        isLoggedIn = false;
-        userId = null;
-      });
-      debugPrint("🚨 User is not logged in or token expired.");
-    }
-  }
-
-  Future<List<ProductDetail>> fetchProducts() async {
-    try {
-      final response = await http
-          .get(
-            Uri.parse('https://pa-gebeya-backend.onrender.com/api/products/'),
-          )
-          .timeout(const Duration(seconds: 15));
-
-      debugPrint("🔹 API Response Status: ${response.statusCode}");
-      debugPrint("🔹 API Response Body: ${response.body}");
-
-      if (response.statusCode == 200) {
-        List<dynamic> data = jsonDecode(response.body);
-        debugPrint("🟢 Raw Product Data: ${data}");
-        List<ProductDetail> products = data
-            .map((item) => ProductDetail.fromJson(item as Map<String, dynamic>))
-            .toList();
-
-        setState(() {
-          allProducts = products;
-          displayedProducts = allProducts.take(itemsToShow).toList();
-        });
-
-        return products;
-      } else {
-        throw Exception('Failed to load products: ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint("❌ Error fetching products: $e");
-      throw Exception('Failed to load products: $e');
-    }
-  }
-
-  Future<void> addToCart(ProductDetail product) async {
-    debugPrint("🟢 addToCart called for product: ${product.id}");
-
-    if (product.id == null || product.id!.isEmpty) {
-      debugPrint("🚨 Error: Product ID is null or empty!");
-      showToast("Error: Product ID is missing", error: true);
-      return;
-    }
-
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? token = prefs.getString('token');
-    String? storedUserId = prefs.getString('userId');
-
-    if (token == null || token.isEmpty) {
-      debugPrint("🚨 Error: Token is missing or expired!");
-      showToast("Token is missing or expired. Please log in again.",
-          error: true);
-      return;
-    }
-
-    if (storedUserId == null || storedUserId.isEmpty) {
-      debugPrint("🚨 Error: User ID is missing!");
-      showToast("User ID is missing. Please log in again.", error: true);
-      return;
-    }
-
-    final url = Uri.parse('https://pa-gebeya-backend.onrender.com/api/cart');
-    var request = http.MultipartRequest('POST', url);
-    request.headers['Authorization'] = 'Bearer $token';
-    request.fields['userId'] = storedUserId;
-    request.fields['productId'] = product.id!;
-    request.fields['productName'] = product.name;
-    request.fields['price'] = product.price.toString();
-    request.fields['quantity'] = (cartItems[product.id] ?? 1).toString();
-
-    if (product.photo != null && product.photo!.isNotEmpty) {
-      request.fields['img'] = product.photo!;
-      debugPrint("🟢 Image URL added to request: ${product.photo}");
-    }
-
-    debugPrint("🔹 Sending request to: $url");
-    debugPrint("📌 Request fields: ${request.fields}");
-
-    try {
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
-      debugPrint("✅ Response Status: ${response.statusCode}");
-      debugPrint("📩 Response Body: $responseBody");
-
-      if (response.statusCode == 200) {
-        showToast(
-            "${cartItems[product.id] ?? 1} ${product.name} added to cart");
-      } else {
-        final errorMessage =
-            jsonDecode(responseBody)['error'] ?? "Unknown error";
-        showToast("Please login first to add ${product.name} to cart",
-            error: true);
-      }
-    } catch (error) {
-      debugPrint("❌ Error adding to cart: $error");
-      showToast("Error adding to cart. Please try again.", error: true);
-    }
-  }
-
-  void updateQuantity(String? productId, bool increase) {
-    if (productId == null) {
-      debugPrint("🚨 Error: Product ID is null!");
-      showToast("Error: Product ID is missing", error: true);
-      return;
-    }
-
-    setState(() {
-      int currentQuantity = cartItems[productId] ?? 0;
-      if (increase) {
-        cartItems[productId] = currentQuantity + 1;
-      } else {
-        cartItems[productId] = (currentQuantity > 1) ? currentQuantity - 1 : 0;
-      }
-
-      if (cartItems[productId]! <= 0) {
-        cartItems.remove(productId);
+  void _startAutoScroll(PageController controller, int imageCount) {
+    Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (controller.hasClients) {
+        if (controller.page ==
+            (controller.position.maxScrollExtent / 200).floor()) {
+          controller.animateToPage(
+            0,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+          );
+        } else {
+          controller.nextPage(
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+          );
+        }
       }
     });
   }
@@ -249,15 +228,7 @@ class _ForYouScreenState extends State<ForYouScreen>
       backgroundColor: error ? Colors.red : Colors.green,
       textColor: Colors.white,
       fontSize: 16.0,
-      timeInSecForIosWeb: 3,
     );
-  }
-
-  void _loadMoreProducts() {
-    setState(() {
-      int nextCount = displayedProducts.length + 10;
-      displayedProducts = allProducts.take(nextCount).toList();
-    });
   }
 
   Widget buildRatingStars(double rating) {
@@ -266,11 +237,11 @@ class _ForYouScreenState extends State<ForYouScreen>
     return Row(
       children: List.generate(5, (index) {
         if (index < fullStars) {
-          return Icon(Icons.star, size: 16, color: Colors.yellow);
+          return const Icon(Icons.star, size: 16, color: Colors.yellow);
         } else if (hasHalfStar && index == fullStars) {
-          return Icon(Icons.star_half, size: 16, color: Colors.yellow);
+          return const Icon(Icons.star_half, size: 16, color: Colors.yellow);
         } else {
-          return Icon(Icons.star, size: 16, color: Colors.grey);
+          return const Icon(Icons.star, size: 16, color: Colors.grey);
         }
       }),
     );
@@ -289,17 +260,55 @@ class _ForYouScreenState extends State<ForYouScreen>
     }
   }
 
+  void _loadMoreProducts() {
+    setState(() {
+      int nextCount = displayedProducts.length + 10;
+      displayedProducts = allProducts.take(nextCount).toList();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return FutureBuilder<List<ProductDetail>>(
       future: futureProducts,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('Error: ${snapshot.error}',
+                    style: const TextStyle(color: Colors.red)),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: _refreshProducts,
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text('No products available'));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('No products available'),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: _refreshProducts,
+                  child: const Text('Refresh'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (allProducts.isEmpty && snapshot.data!.isNotEmpty) {
+          allProducts = snapshot.data!;
+          displayedProducts = allProducts.take(itemsToShow).toList();
         }
 
         return SingleChildScrollView(
@@ -308,7 +317,7 @@ class _ForYouScreenState extends State<ForYouScreen>
             children: [
               Headline(
                 headline: 'For You',
-                onViewAllTap: () {},
+                onViewAllTap: _refreshProducts,
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10.0),
@@ -328,14 +337,12 @@ class _ForYouScreenState extends State<ForYouScreen>
                     final fullImageUrls =
                         imageUrls.map(_getFullImageUrl).toList();
 
-                    debugPrint(
-                        "🟢 Loading images for ${product.name}: $fullImageUrls");
+                    // Create a new controller for each PageView
+                    final pageController = PageController();
 
-                    if (!_pageControllers.containsKey(product.id)) {
-                      _pageControllers[product.id!] = PageController();
-                      if (fullImageUrls.length > 1) {
-                        _startAutoScroll(product.id!, fullImageUrls.length);
-                      }
+                    // Start auto-scroll if there are multiple images
+                    if (fullImageUrls.length > 1) {
+                      _startAutoScroll(pageController, fullImageUrls.length);
                     }
 
                     return GestureDetector(
@@ -379,7 +386,7 @@ class _ForYouScreenState extends State<ForYouScreen>
                                   SizedBox(
                                     height: 120,
                                     child: PageView.builder(
-                                      controller: _pageControllers[product.id],
+                                      controller: pageController,
                                       itemCount: fullImageUrls.length,
                                       itemBuilder: (context, imageIndex) {
                                         return ClipRRect(
@@ -390,9 +397,6 @@ class _ForYouScreenState extends State<ForYouScreen>
                                             height: 120,
                                             width: double.infinity,
                                             fit: BoxFit.cover,
-                                            headers: {
-                                              'Accept': 'image/*',
-                                            },
                                             loadingBuilder:
                                                 (context, child, progress) {
                                               if (progress == null)
@@ -413,8 +417,6 @@ class _ForYouScreenState extends State<ForYouScreen>
                                             },
                                             errorBuilder:
                                                 (context, error, stackTrace) {
-                                              debugPrint(
-                                                  "❌ Error loading image: $error");
                                               return Container(
                                                 color: Colors.grey[200],
                                                 child: Column(
@@ -426,7 +428,8 @@ class _ForYouScreenState extends State<ForYouScreen>
                                                         color:
                                                             Colors.grey[400]),
                                                     const SizedBox(height: 5),
-                                                    Text("Image not available",
+                                                    const Text(
+                                                        "Image not available",
                                                         style: TextStyle(
                                                             fontSize: 12)),
                                                   ],
@@ -449,7 +452,7 @@ class _ForYouScreenState extends State<ForYouScreen>
                                           borderRadius:
                                               BorderRadius.circular(4),
                                         ),
-                                        child: Text(
+                                        child: const Text(
                                           'For You',
                                           style: TextStyle(
                                             fontSize: 10,
@@ -480,7 +483,7 @@ class _ForYouScreenState extends State<ForYouScreen>
                                   const SizedBox(height: 6),
                                   Text(
                                     product.shortDescription,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey,
                                     ),
@@ -494,7 +497,7 @@ class _ForYouScreenState extends State<ForYouScreen>
                                       const SizedBox(width: 4),
                                       Text(
                                         '| ${product.rating ?? 0}',
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           fontSize: 12,
                                           color: Colors.grey,
                                         ),
@@ -502,7 +505,7 @@ class _ForYouScreenState extends State<ForYouScreen>
                                       const SizedBox(width: 4),
                                       Text(
                                         '| ${product.sold ?? 0} sold',
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           fontSize: 12,
                                           color: Colors.grey,
                                         ),
@@ -512,7 +515,7 @@ class _ForYouScreenState extends State<ForYouScreen>
                                   const SizedBox(height: 6),
                                   Text(
                                     'ETB ${product.price}',
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.blue,

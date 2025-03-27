@@ -433,37 +433,29 @@ class _ProductCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  if (hasDiscount && discountValue > 0)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'ETB ${discountPrice.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue,
-                          ),
+                  Row(
+                    children: [
+                      Text(
+                        'ETB ${hasDiscount ? discountPrice.toStringAsFixed(2) : price.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
                         ),
+                      ),
+                      if (hasDiscount && discountValue > 0) ...[
+                        const SizedBox(width: 8),
                         Text(
                           'ETB ${price.toStringAsFixed(2)}',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 10,
                             decoration: TextDecoration.lineThrough,
-                            color: Colors.grey,
+                            color: Colors.red,
                           ),
                         ),
                       ],
-                    )
-                  else
-                    Text(
-                      'ETB ${price.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                      ),
-                    ),
+                    ],
+                  ),
                 ],
               ),
               if (product.videoLink != null && product.videoLink!.isNotEmpty)

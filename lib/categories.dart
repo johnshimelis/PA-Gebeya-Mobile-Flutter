@@ -1,46 +1,133 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:laza/brand_products_screen.dart';
 import 'package:laza/components/colors.dart';
 import 'package:laza/extensions/context_extension.dart';
 import 'package:laza/models/brand.dart';
 import 'package:laza/components/laza_icons.dart';
 
-class Categories extends StatelessWidget {
+class Categories extends StatefulWidget {
   const Categories({super.key, required this.onCartUpdated});
   final VoidCallback onCartUpdated;
 
-  Future<List<AppCategory>> fetchCategories() async {
+  @override
+  State<Categories> createState() => _CategoriesState();
+}
+
+class _CategoriesState extends State<Categories>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  late Future<List<AppCategory>> _categoriesFuture;
+  final String _categoriesCacheKey = 'cached_categories';
+  String? authToken;
+
+  @override
+  void initState() {
+    super.initState();
+    _categoriesFuture = Future.value([]); // Initialize with empty future
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    await _checkAuthStatus();
+    setState(() {
+      _categoriesFuture = _fetchCategoriesWithCacheFallback();
+    });
+  }
+
+  Future<void> _checkAuthStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    authToken = prefs.getString('token');
+  }
+
+  Future<List<AppCategory>> _fetchCategoriesWithCacheFallback() async {
+    // First try to get cached data
+    final cachedCategories = await _getCachedCategories();
+
+    try {
+      final freshCategories = await _fetchCategoriesFromNetwork();
+      await _cacheCategories(freshCategories);
+      return freshCategories;
+    } catch (e) {
+      debugPrint("❌ Network error: $e");
+      if (cachedCategories != null && cachedCategories.isNotEmpty) {
+        debugPrint("⚠️ Using cached categories as fallback");
+        return cachedCategories;
+      }
+      return [];
+    }
+  }
+
+  Future<List<AppCategory>> _fetchCategoriesFromNetwork() async {
     try {
       final response = await http.get(
         Uri.parse("https://pa-gebeya-backend.onrender.com/api/categories"),
-        headers: {'Accept': 'application/json'},
+        headers: {
+          'Accept': 'application/json',
+          if (authToken != null) 'Authorization': 'Bearer $authToken',
+        },
       ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        debugPrint("Fetched ${data.length} categories");
+        debugPrint("🟢 Fetched ${data.length} categories from network");
         return data.map((json) => AppCategory.fromJson(json)).toList();
       } else {
         throw Exception("Failed to load categories: ${response.statusCode}");
       }
     } catch (e) {
-      throw Exception("Network error: ${e.toString()}");
+      debugPrint('❌ Network fetch error: $e');
+      rethrow;
     }
+  }
+
+  Future<List<AppCategory>?> _getCachedCategories() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedData = prefs.getString(_categoriesCacheKey);
+      if (cachedData == null) return null;
+      return (jsonDecode(cachedData) as List)
+          .map((item) => AppCategory.fromJson(item))
+          .toList();
+    } catch (e) {
+      debugPrint("❌ Error reading cached categories: $e");
+      return null;
+    }
+  }
+
+  Future<void> _cacheCategories(List<AppCategory> categories) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_categoriesCacheKey,
+          jsonEncode(categories.map((c) => c.toJson()).toList()));
+      debugPrint("✅ Cached ${categories.length} categories");
+    } catch (e) {
+      debugPrint("❌ Error caching categories: $e");
+    }
+  }
+
+  Future<void> _refreshCategories() async {
+    setState(() {
+      _categoriesFuture = _fetchCategoriesWithCacheFallback();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Column(
       children: [
         const SizedBox(height: 10.0),
-        const Headline(
+        Headline(
           headline: 'Categories',
-          onViewAllTap: null,
+          onViewAllTap: _refreshCategories,
         ),
         FutureBuilder<List<AppCategory>>(
-          future: fetchCategories(),
+          future: _categoriesFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -53,13 +140,7 @@ class Categories extends StatelessWidget {
                     const Icon(Icons.error, color: Colors.red),
                     Text("Error: ${snapshot.error.toString()}"),
                     ElevatedButton(
-                      onPressed: () => Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              Categories(onCartUpdated: onCartUpdated),
-                        ),
-                      ),
+                      onPressed: _refreshCategories,
                       child: const Text("Retry"),
                     ),
                   ],
@@ -83,20 +164,16 @@ class Categories extends StatelessWidget {
                 children: [
                   // First row
                   SizedBox(
-                    height: 120, // Fixed height for consistent layout
-                    child: SingleChildScrollView(
+                    height: 120,
+                    child: ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: List.generate(
-                          firstRow.length,
-                          (index) => Padding(
-                            padding: const EdgeInsets.only(right: 4.0),
-                            child: CategoryTile(
-                              category: firstRow[index],
-                              onCartUpdated: onCartUpdated,
-                            ),
-                          ),
+                      physics: const ClampingScrollPhysics(),
+                      itemCount: firstRow.length,
+                      itemBuilder: (context, index) => Padding(
+                        padding: const EdgeInsets.only(right: 4.0),
+                        child: CategoryTile(
+                          category: firstRow[index],
+                          onCartUpdated: widget.onCartUpdated,
                         ),
                       ),
                     ),
@@ -104,20 +181,16 @@ class Categories extends StatelessWidget {
                   const SizedBox(height: 8),
                   // Second row
                   SizedBox(
-                    height: 120, // Fixed height for consistent layout
-                    child: SingleChildScrollView(
+                    height: 120,
+                    child: ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: List.generate(
-                          secondRow.length,
-                          (index) => Padding(
-                            padding: const EdgeInsets.only(right: 4.0),
-                            child: CategoryTile(
-                              category: secondRow[index],
-                              onCartUpdated: onCartUpdated,
-                            ),
-                          ),
+                      physics: const ClampingScrollPhysics(),
+                      itemCount: secondRow.length,
+                      itemBuilder: (context, index) => Padding(
+                        padding: const EdgeInsets.only(right: 4.0),
+                        child: CategoryTile(
+                          category: secondRow[index],
+                          onCartUpdated: widget.onCartUpdated,
                         ),
                       ),
                     ),
@@ -248,4 +321,10 @@ class AppCategory {
       image: json['image']?.toString(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        '_id': id,
+        'name': name,
+        'image': image,
+      };
 }
